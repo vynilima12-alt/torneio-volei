@@ -145,14 +145,14 @@ with aba_confronto:
     jogadores_a = df_jogadores[df_jogadores["time"] == time_a_sel]
     jogadores_b = df_jogadores[df_jogadores["time"] == time_b_sel]
 
-    if jugadores_a.empty or jugadores_b.empty:
+    if jogadores_a.empty or jogadores_b.empty:
         st.warning(f"Ambas as seleções do {grupo_sel} precisam ter atletas cadastrados para iniciar a partida.")
     else:
         st.markdown("---")
         st.subheader(f"📊 Placar Geral — {grupo_sel}")
 
         if "partida_ativa" not in st.session_state:
-            st.session_state.pontos_jogo_locais = {row["id"]: 0 for _, row in pd.concat([jogadores_a, jugadores_b]).iterrows()}
+            st.session_state.pontos_jogo_locais = {row["id"]: 0 for _, row in pd.concat([jogadores_a, jogadores_b]).iterrows()}
             st.session_state.set_atual = 1
             st.session_state.historico_parciais = []
             st.session_state.sets_ganhos_a = 0
@@ -193,7 +193,7 @@ with aba_confronto:
 
         with col_quadra_b:
             st.markdown(f"**Jogadores de {time_b_sel}**")
-            for _, row in jugadores_b.iterrows():
+            for _, row in jogadores_b.iterrows():
                 j_id = row["id"]
                 c_img, c_txt, c_btn = st.columns([1, 2, 1])
                 with c_img:
