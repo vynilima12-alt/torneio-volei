@@ -3,7 +3,7 @@ import pandas as pd
 import base64
 from PIL import Image
 import io
-from st_supabase_connection import SupabaseConnection
+from supabase import create_client, Client
 
 # =========================================================
 # 1. CONFIGURAÇÕES DA PÁGINA
@@ -13,8 +13,12 @@ st.title("🏆 Gestão do Torneio de Vôlei (Database Online)")
 
 FOTO_PADRAO_URL = "https://cdn-icons-png.flaticon.com/512/4333/4333609.png"
 
-# Conexão Nativa com o Banco de Dados Supabase
-conn = st.connection("supabase", type=SupabaseConnection)
+# Puxa as credenciais diretamente dos Secrets salvos no Streamlit Cloud
+SUPABASE_URL = st.secrets["connections"]["supabase"]["url"]
+SUPABASE_KEY = st.secrets["connections"]["supabase"]["key"]
+
+# Cria a conexão direta com o Banco de Dados
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # =========================================================
 # 2. FUNÇÕES DE BANCO DE DADOS (PULL / PUSH)
@@ -22,11 +26,9 @@ conn = st.connection("supabase", type=SupabaseConnection)
 def carregar_dados_banco():
     """Busca a tabela de jogadores direto do banco de dados relacional"""
     try:
-        # ttl=0 garante que ele não use cache e pegue sempre o dado mais recente do banco
-        response = conn.table("jogadores").select("*").execute()
+        response = supabase.table("jogadores").select("*").execute()
         if response.data:
             df = pd.DataFrame(response.data)
-            # Garante a ordenação correta pelo ID
             return df.sort_values(by="id").reset_index(drop=True)
         return pd.DataFrame(columns=["id", "nome", "time", "pontos", "foto_time", "foto_jogador"])
     except Exception as e:
@@ -36,7 +38,7 @@ def carregar_dados_banco():
 def atualizar_pontos_banco(jogador_id, novos_pontos):
     """Atualiza a pontuação de um jogador específico no banco"""
     try:
-        conn.table("jogadores").update({"pontos": novos_pontos}).eq("id", jogador_id).execute()
+        supabase.table("jogadores").update({"pontos": novos_pontos}).eq("id", jogador_id).execute()
         return True
     except Exception as e:
         st.error(f"Erro ao salvar pontos no banco: {e}")
@@ -52,7 +54,7 @@ def inserir_jogador_banco(nome, time, emoji, foto_base64):
             "foto_jogador": foto_base64,
             "pontos": 0
         }
-        conn.table("jogadores").insert(dados).execute()
+        supabase.table("jogadores").insert(dados).execute()
         return True
     except Exception as e:
         st.error(f"Erro ao cadastrar no banco: {e}")
@@ -87,7 +89,6 @@ with aba_ranking:
         
         with col1:
             st.header("🏆 Classificação dos Times")
-            # Padroniza os nomes das colunas vindas do banco em minúsculo
             ranking_times = df_jogadores.groupby("time")["pontos"].sum().reset_index()
             ranking_times = ranking_times.sort_values(by="pontos", ascending=False)
             
@@ -156,7 +157,7 @@ with aba_registrar:
             
             if st.button("💾 Confirmar e Salvar no Banco de Dados", type="primary", use_container_width=True):
                 if atualizar_pontos_banco(st.session_state.id_jogador_sel, st.session_state.pontos_temp):
-                    st.success(f"Placar de {st.session_state.nome_jogador_sel} atualizado com sucesso e salvo na nuvem!")
+                    st.success(f"Placar de {st.session_state.nome_jogador_sel} atualizado com sucesso!")
                     del st.session_state.id_jogador_sel
                     st.rerun()
             st.markdown("</div>", unsafe_allow_html=True)
@@ -169,7 +170,7 @@ with aba_admin:
     senha = st.text_input("Senha Master:", type="password")
     
     if senha == "volei123":
-        st.success("Acesso administrativo liberado.")
+        st.success("Acesso administrative liberado.")
         st.markdown("---")
         
         st.subheader("📦 Backoffice (Exportar Dados)")
@@ -195,7 +196,7 @@ with aba_admin:
             if nome_novo and time_novo:
                 string_foto_jogador = converter_imagem_para_base64(arquivo_foto)
                 if inserir_jogador_banco(nome_novo, time_novo, emoji_time, string_foto_jogador):
-                    st.success(f"Atleta {nome_novo} gravado no Banco de Dados com sucesso!")
+                    st.success(f"Atleta {nome_novo} gravado com sucesso!")
                     st.rerun()
             else:
                 st.error("Por favor, preencha os campos obrigatórios de Nome e Time.")
