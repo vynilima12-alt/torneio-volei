@@ -132,27 +132,26 @@ with aba_ranking:
 with aba_confronto:
     st.header("⚔️ Gerenciar Partida em Tempo Real")
     
-    # Seleção do Grupo do Confronto
-    grupo_sel = st.radio("Escolha a chave do confronto:", options=["Grupo A", "Grupo B"], horizontal=True)
-    lista_times_grupo = GRUPO_A if grupo_sel == "Grupo A" else GRUPO_B
-
+    # Seleção unificada de todos os times da Copa
     c_t1, c_t2 = st.columns(2)
     with c_t1:
-        time_a_sel = st.selectbox("Selecione o Time A:", options=lista_times_grupo, index=0)
+        time_a_sel = st.selectbox("Selecione o Time A:", options=TODOS_TIMES, index=0)
     with c_t2:
-        time_b_sel = st.selectbox("Selecione o Time B:", options=[t for t in lista_times_grupo if t != time_a_sel], index=0)
+        # Filtra as opções do Time B para remover o país que foi selecionado no Time A
+        opcoes_time_b = [t for t in TODOS_TIMES if t != time_a_sel]
+        time_b_sel = st.selectbox("Selecione o Time B:", options=opcoes_time_b, index=0)
 
-    jogadores_a = df_jogadores[df_jogadores["time"] == time_a_sel]
-    jogadores_b = df_jogadores[df_jogadores["time"] == time_b_sel]
+    jugadores_a = df_jogadores[df_jogadores["time"] == time_a_sel]
+    jugadores_b = df_jogadores[df_jogadores["time"] == time_b_sel]
 
-    if jogadores_a.empty or jogadores_b.empty:
-        st.warning(f"Ambas as seleções do {grupo_sel} precisam ter atletas cadastrados para iniciar a partida.")
+    if jugadores_a.empty or jugadores_b.empty:
+        st.warning("Ambas as seleções precisam ter atletas cadastrados para iniciar a partida.")
     else:
         st.markdown("---")
-        st.subheader(f"📊 Placar Geral — {grupo_sel}")
+        st.subheader("📊 Placar Geral — Confronto Direto")
 
         if "partida_ativa" not in st.session_state:
-            st.session_state.pontos_jogo_locais = {row["id"]: 0 for _, row in pd.concat([jogadores_a, jogadores_b]).iterrows()}
+            st.session_state.pontos_jogo_locais = {row["id"]: 0 for _, row in pd.concat([jugadores_a, jugadores_b]).iterrows()}
             st.session_state.set_atual = 1
             st.session_state.historico_parciais = []
             st.session_state.sets_ganhos_a = 0
@@ -177,7 +176,7 @@ with aba_confronto:
         
         with col_quadra_a:
             st.markdown(f"**Jogadores de {time_a_sel}**")
-            for _, row in jogadores_a.iterrows():
+            for _, row in jugadores_a.iterrows():
                 j_id = row["id"]
                 c_img, c_txt, c_btn = st.columns([1, 2, 1])
                 with c_img:
@@ -193,7 +192,7 @@ with aba_confronto:
 
         with col_quadra_b:
             st.markdown(f"**Jogadores de {time_b_sel}**")
-            for _, row in jogadores_b.iterrows():
+            for _, row in jugadores_b.iterrows():
                 j_id = row["id"]
                 c_img, c_txt, c_btn = st.columns([1, 2, 1])
                 with c_img:
