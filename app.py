@@ -10,10 +10,10 @@ import os
 # CONFIGURAÇÃO DE PROXY (Para funcionar na rede do banco)
 # =========================================================
 # Adicione estas 3 linhas para o Python conseguir acessar o Google Sheets pelo proxy:
-os.environ["http_proxy"] = "http://webproxy.brb.com.br:8080"
-os.environ["https_proxy"] = "http://webproxy.brb.com.br:8080"
-os.environ["HTTP_PROXY"] = "http://webproxy.brb.com.br:8080"
-os.environ["HTTPS_PROXY"] = "http://webproxy.brb.com.br:8080"
+#os.environ["http_proxy"] = "http://webproxy.brb.com.br:8080"
+#os.environ["https_proxy"] = "http://webproxy.brb.com.br:8080"
+#os.environ["HTTP_PROXY"] = "http://webproxy.brb.com.br:8080"
+#os.environ["HTTPS_PROXY"] = "http://webproxy.brb.com.br:8080"
 
 # =========================================================
 # 1. CONFIGURAÇÕES DA PÁGINA
