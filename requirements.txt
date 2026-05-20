@@ -1,6 +1,6 @@
 streamlit>=1.28
 pandas
-streamlit-gsheets
+streamlit-gsheets-connection
 Pillow
 gspread
 oauth2client
