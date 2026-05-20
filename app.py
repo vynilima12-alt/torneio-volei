@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import base64
-from PIL import Image
+from PIL import Image, ImageOps
 import io
 from supabase import create_client, Client
 
@@ -29,7 +29,10 @@ def carregar_dados_banco():
         response = supabase.table("jogadores").select("*").execute()
         if response.data:
             df = pd.DataFrame(response.data)
-            return df.sort_values(by="id").reset_index(drop=True)
+            # Ordena por ID caso a coluna exista no banco
+            if "id" in df.columns:
+                return df.sort_values(by="id").reset_index(drop=True)
+            return df.sort_values(by="nome").reset_index(drop=True)
         return pd.DataFrame(columns=["id", "nome", "time", "pontos", "foto_time", "foto_jogador"])
     except Exception as e:
         st.error(f"Erro ao conectar ao Banco de Dados: {e}")
@@ -60,10 +63,34 @@ def inserir_jogador_banco(nome, time, emoji, foto_base64):
         st.error(f"Erro ao cadastrar no banco: {e}")
         return False
 
+def deletar_jogador_banco(jogador_id):
+    """Exclui permanentemente um jogador do banco de dados"""
+    try:
+        supabase.table("jogadores").delete().eq("id", jogador_id).execute()
+        return True
+    except Exception as e:
+        st.error(f"Erro ao remover jogador do banco: {e}")
+        return False
+
+def editar_jogador_banco(jogador_id, novo_nome, novo_time, novo_emoji):
+    """Atualiza os dados cadastrais de um jogador existente"""
+    try:
+        dados = {
+            "nome": novo_nome,
+            "time": novo_time,
+            "foto_time": novo_emoji
+        }
+        supabase.table("jogadores").update(dados).eq("id", jogador_id).execute()
+        return True
+    except Exception as e:
+        st.error(f"Erro ao atualizar cadastro no banco: {e}")
+        return False
+
 def converter_imagem_para_base64(arquivo_imagem):
     if arquivo_imagem is not None:
         img = Image.open(arquivo_imagem)
-        img = img.resize((150, 150))
+        # ImageOps.fit garante o corte 1:1 perfeito no centro sem deformar o rosto
+        img = ImageOps.fit(img, (150, 150), Image.Resampling.LANCZOS)
         buffered = io.BytesIO()
         img.save(buffered, format="PNG")
         img_str = base64.b64encode(buffered.getvalue()).decode()
@@ -94,7 +121,7 @@ with aba_ranking:
             
             st.dataframe(
                 ranking_times,
-                column_config={"time": "Equipe", "pontos": "Pontos Conquistados"},
+                column_config={"time": "Equipe", "pontos": "Points Conquistados"},
                 hide_index=True,
                 use_container_width=True
             )
@@ -134,10 +161,9 @@ with aba_registrar:
                 st.caption(f"{simbolo_time} {row['time']} | {row['pontos']} pts")
                 
                 if st.button("Selecionar", key=f"btn_{row['id']}"):
-                    st.session_state.id_jogador_sel = int(row["id"])
+                    st.session_state.id_jogador_sel = row["id"]
                     st.session_state.nome_jogador_sel = row["nome"]
                     st.session_state.pontos_temp = int(row["pontos"])
-                    st.rerun()
 
         if 'id_jogador_sel' in st.session_state:
             st.markdown("""<div style="background-color: #f8f9fa; padding: 20px; border-radius: 10px; border: 1px solid #ddd; margin-top: 20px;">""", unsafe_allow_html=True)
@@ -147,17 +173,15 @@ with aba_registrar:
             with c1:
                 if st.button("➖ Diminuir", use_container_width=True):
                     st.session_state.pontos_temp -= 1
-                    st.rerun()
             with c2:
                 st.markdown(f"<h1 style='text-align:center; color:#ff4b4b;'>{st.session_state.pontos_temp}</h1>", unsafe_allow_html=True)
             with c3:
                 if st.button("➕ Aumentar", use_container_width=True):
                     st.session_state.pontos_temp += 1
-                    st.rerun()
             
             if st.button("💾 Confirmar e Salvar no Banco de Dados", type="primary", use_container_width=True):
                 if atualizar_pontos_banco(st.session_state.id_jogador_sel, st.session_state.pontos_temp):
-                    st.success(f"Placar de {st.session_state.nome_jogador_sel} atualizado com sucesso!")
+                    st.success(f"Placar de {st.session_state.nome_jogador_sel} updated com sucesso!")
                     del st.session_state.id_jogador_sel
                     st.rerun()
             st.markdown("</div>", unsafe_allow_html=True)
@@ -170,7 +194,7 @@ with aba_admin:
     senha = st.text_input("Senha Master:", type="password")
     
     if senha == "volei123":
-        st.success("Acesso administrative liberado.")
+        st.success("Acesso administrativo liberado.")
         st.markdown("---")
         
         st.subheader("📦 Backoffice (Exportar Dados)")
@@ -200,5 +224,46 @@ with aba_admin:
                     st.rerun()
             else:
                 st.error("Por favor, preencha os campos obrigatórios de Nome e Time.")
+
+        # Gerenciamento agora está trancado dentro do bloco correto da senha master!
+        st.markdown("---")
+        st.subheader("🛠️ Gerenciar Atletas Cadastrados")
+
+        if not df_jogadores.empty:
+            jogador_selecionado = st.selectbox(
+                "Selecione um atleta para editar ou remover:",
+                options=df_jogadores["nome"].tolist()
+            )
+
+            dados_atleta = df_jogadores[df_jogadores["nome"] == jogador_selecionado].iloc[0]
+            id_atleta = dados_atleta["id"]
+
+            col_ed1, col_ed2, col_ed3 = st.columns(3)
+            with col_ed1:
+                nome_editado = st.text_input("Editar Nome:", value=dados_atleta["nome"], key=f"edit_nome_{id_atleta}")
+            with col_ed2:
+                time_edited = st.text_input("Editar Equipe:", value=dados_atleta["time"], key=f"edit_time_{id_atleta}")
+            with col_ed3:
+                emoji_editado = st.text_input("Editar Símbolo/Emoji:", value=dados_atleta["foto_time"], key=f"edit_emoji_{id_atleta}")
+
+            col_botoes = st.columns([1, 1, 2])
+            with col_botoes[0]:
+                if st.button("💾 Salvar Alterações", type="primary", use_container_width=True, key=f"btn_salvar_{id_atleta}"):
+                    if editar_jogador_banco(id_atleta, nome_editado, time_edited, emoji_editado):
+                        st.success("Cadastro atualizado com sucesso!")
+                        st.rerun()
+
+            with col_botoes[1]:
+                confirmar_exclusao = st.checkbox("⚠️ Confirmar exclusão", key=f"check_del_{id_atleta}")
+                if st.button("🗑️ Remover Atleta", type="secondary", use_container_width=True, key=f"btn_del_{id_atleta}"):
+                    if confirmar_exclusao:
+                        if deletar_jogador_banco(id_atleta):
+                            st.success(f"{jogador_selecionado} foi removido do torneio.")
+                            st.rerun()
+                    else:
+                        st.error("Marque a caixa de confirmação para poder deletar.")
+        else:
+            st.info("Nenhum atleta cadastrado para gerenciamento.")
+            
     elif senha != "":
         st.error("Senha incorreta.")
