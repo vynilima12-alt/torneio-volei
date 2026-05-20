@@ -22,7 +22,7 @@ st.set_page_config(page_title="Torneio de Vôlei Online", layout="wide")
 st.title("🏆 Gestão do Torneio de Vôlei")
 
 # URL pública da sua planilha do Google
-URL_PLANILHA = "https://docs.google.com/spreadsheets/d/17CWheIF3UG2TIuUoAkHfNTSwuHJBElSPdf8PHRVZb8c/edit?usp=sharing"
+URL_PLANILHA = "https://docs.google.com/spreadsheets/d/17CWheIF3UG2TIuUoAkHfNTSwuHJBElSPdf8PHRVZb8c"
 
 # ... (todo o resto do seu código online com gsheets continua igualzinho abaixo)
 
@@ -66,7 +66,19 @@ def converter_imagem_para_base64(arquivo_imagem):
 
 # Inicializa os dados no session_state puxando da nuvem na primeira execução
 if 'df_jogadores' not in st.session_state:
-    st.session_state.df_jogadores = carregar_dados_online()
+    df_inicial = carregar_dados_online()
+
+    if df_inicial is None:
+        df_inicial = pd.DataFrame(columns=[
+            "ID",
+            "NOME",
+            "TIME",
+            "PONTOS",
+            "FOTO TIME",
+            "FOTO JOGADOR"
+        ])
+
+    st.session_state.df_jogadores = df_inicial
 
 # =========================================================
 # 3. INTERFACE INTERATIVA (ABAS)
@@ -94,7 +106,7 @@ with aba_ranking:
                 ranking_times,
                 column_config={"TIME": "Equipe", "PONTOS": "Pontos Conquistados"},
                 hide_index=True,
-                width="stretch"
+                use_container_width=True
             )
             
         with col2:
@@ -111,7 +123,7 @@ with aba_ranking:
                     "PONTOS": "Pontos Individuais"
                 },
                 hide_index=True,
-                width="stretch"
+                use_container_width=True
             )
     else:
         st.info("Nenhum dado encontrado na planilha online. Acesse o Painel Admin para cadastrar os jogadores.")
@@ -152,17 +164,17 @@ with aba_registrar:
             
             c1, c2, c3 = st.columns([1, 1, 1])
             with c1:
-                if st.button("➖ Diminuir", width="stretch"):
+                if st.button("➖ Diminuir", use_container_width=True):
                     st.session_state.pontos_temp -= 1
                     st.rerun()
             with c2:
                 st.markdown(f"<h1 style='text-align:center; color:#ff4b4b;'>{st.session_state.pontos_temp}</h1>", unsafe_allow_html=True)
             with c3:
-                if st.button("➕ Aumentar", width="stretch"):
+                if st.button("➕ Aumentar", use_container_width=True):
                     st.session_state.pontos_temp += 1
                     st.rerun()
             
-            if st.button("💾 Salvar Alteração na Nuvem (Google Sheets)", type="primary", width="stretch"):
+            if st.button("💾 Salvar Alteração na Nuvem (Google Sheets)", type="primary", use_container_width=True):
                 # 1. Modifica na memória
                 st.session_state.df_jogadores.loc[st.session_state.df_jogadores["ID"] == id_sel, "PONTOS"] = st.session_state.pontos_temp
                 
