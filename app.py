@@ -113,9 +113,24 @@ def converter_imagem_para_base64(arquivo_imagem):
         img = ImageOps.fit(img, (150, 150), Image.Resampling.LANCZOS)
         buffered = io.BytesIO()
         img.save(buffered, format="PNG")
-        img_str = base64.b64encode(buffered.getvalue()).decode()
-        return f"data:image/png;base64,{img_str}"
+        # Retorna apenas a string base64 pura
+        return base64.b64encode(buffered.getvalue()).decode()
     return ""
+
+def obter_imagem_atleta(dados_foto):
+    if pd.isna(dados_foto) or str(dados_foto).strip() == "":
+        return FOTO_PADRAO_URL
+    
+    # Se a string contiver o prefixo antigo por segurança, limpa
+    if "base64," in str(dados_foto):
+        dados_foto = str(dados_foto).split("base64,")[1]
+        
+    try:
+        # Converte a string de texto do banco de volta para bytes de imagem
+        img_bytes = base64.b64decode(dados_foto)
+        return img_bytes
+    except Exception:
+        return FOTO_PADRAO_URL
 
 df_jogadores = carregar_dados_banco()
 df_partidas = carregar_partidas_banco()
