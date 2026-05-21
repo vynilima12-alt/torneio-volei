@@ -94,6 +94,19 @@ def deletar_jogador_banco(jogador_id):
     except Exception:
         return False
 
+def editar_jogador_banco(jogador_id, novo_nome, novo_time, novo_emoji):
+    try:
+        dados = {
+            "nome": novo_nome,
+            "time": novo_time,
+            "foto_time": novo_emoji
+        }
+        supabase.table("jogadores").update(dados).eq("id", jogador_id).execute()
+        return True
+    except Exception as e:
+        st.error(f"Erro ao atualizar cadastro no banco: {e}")
+        return False
+
 def converter_imagem_para_base64(arquivo_imagem):
     if arquivo_imagem is not None:
         img = Image.open(arquivo_imagem)
@@ -269,14 +282,12 @@ with aba_confronto:
 with aba_historico:
     st.header("📜 Histórico de Partidas Realizadas")
     
-    # Verifica de forma silenciosa se o admin está logado na sessão
     is_admin = st.session_state.get("admin_logado", False)
     
     if not df_partidas.empty:
         for _, partida in df_partidas.iterrows():
             p_id = partida['id']
             
-            # Layout do card com alto contraste
             st.markdown(
                 f"""
                 <div style="background-color: #ffffff; padding: 20px; border-radius: 12px; margin-bottom: 5px; border-left: 6px solid #ff4b4b; box-shadow: 0px 4px 6px rgba(0,0,0,0.05);">
@@ -293,7 +304,6 @@ with aba_historico:
                 unsafe_allow_html=True
             )
             
-            # Se for admin, renderiza um expander discreto logo abaixo do card para edição
             if is_admin:
                 with st.expander(f"🛠️ Editar resultado da partida #{p_id}"):
                     c_ed1, c_ed2, c_ed3 = st.columns([1, 1, 2])
@@ -319,6 +329,9 @@ with aba_admin:
         st.session_state.admin_logado = True
         st.success("Acesso administrativo liberado.")
         
+        # ==========================================
+        # 1. BLOCO DE CADASTRO
+        # ==========================================
         st.markdown("---")
         st.subheader("Adicionar Novo Atleta ao Torneio")
         nome_novo = st.text_input("Nome completo do jogador:")
@@ -338,13 +351,44 @@ with aba_admin:
             else:
                 st.error("Por favor, digite o nome do jogador.")
 
+        # ==========================================
+        # 2. BLOCO DE EDIÇÃO (RECUPERADO)
+        # ==========================================
+        st.markdown("---")
+        st.subheader("🛠️ Editar Cadastro de Atleta")
+        if not df_jogadores.empty:
+            jogador_editar = st.selectbox("Selecione quem deseja editar:", options=df_jogadores["nome"].tolist(), key="sb_edit_adm")
+            dados_atleta = df_jogadores[df_jogadores["nome"] == jogador_editar].iloc[0]
+            id_atleta = dados_atleta["id"]
+
+            col_ed1, col_ed2 = st.columns(2)
+            with col_ed1:
+                nome_editado = st.text_input("Editar Nome:", value=dados_atleta["nome"], key=f"edit_nome_{id_atleta}")
+            with col_ed2:
+                time_editado = st.selectbox("Mudar Seleção:", options=TODOS_TIMES, index=TODOS_TIMES.index(dados_atleta["time"]), key=f"edit_time_{id_atleta}")
+
+            if st.button("💾 Salvar Alterações", type="primary", key=f"btn_salvar_{id_atleta}"):
+                emoji_novo = time_editado.split()[0]
+                if editar_jogador_banco(id_atleta, nome_editado, time_editado, emoji_novo):
+                    st.success("Cadastro atualizado com sucesso!")
+                    st.rerun()
+        else:
+            st.info("Nenhum atleta cadastrado para edição.")
+
+        # ==========================================
+        # 3. BLOCO DE EXCLUSÃO
+        # ==========================================
         st.markdown("---")
         st.subheader("🗑️ Remover Atleta do Torneio")
         if not df_jogadores.empty:
-            jogador_del = st.selectbox("Selecione quem deseja remover:", options=df_jogadores["nome"].tolist())
+            jogador_del = st.selectbox("Selecione quem deseja remover:", options=df_jogadores["nome"].tolist(), key="sb_del_adm")
             id_del = df_jogadores[df_jogadores["nome"] == jogador_del].iloc[0]["id"]
-            confirma = st.checkbox("Confirmo a exclusão permanente deste jogador.")
-            if st.button("Deletar Jogador", type="primary"):
-                if confirma and deletar_jogador_banco(id_del):
-                    st.success("Jogador removido do banco.")
-                    st.rerun()
+            confirma = st.checkbox("Confirmo a exclusão permanente deste jogador.", key=f"check_del_{id_del}")
+            
+            if st.button("Deletar Jogador", type="secondary", key=f"btn_del_{id_del}"):
+                if confirma:
+                    if deletar_jogador_banco(id_del):
+                        st.success("Jogador removido do banco.")
+                        st.rerun()
+                else:
+                    st.error("Marque a caixa de confirmação para poder deletar.")
