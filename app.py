@@ -176,35 +176,80 @@ with aba_ranking:
     else:
         st.info("Nenhum atleta cadastrado no torneio.")
 
-# --- ABA 2: ELENCO & FICHAS ---
+# --- ABA 2: ELENCO & FICHAS (MODO ALBUM DE FIGURINHAS) ---
 with aba_elenco:
-    st.header("🏃‍♂️ Informações Detalhadas dos Atletas")
+    st.header("📖 Álbum de Figurinhas Oficial — Copa 2026")
+    
     if not df_jogadores.empty:
-        selecao_filtro = st.selectbox("Filtrar por Seleção:", options=["Todos"] + TODOS_TIMES)
-        df_filtrado = df_jogadores.copy()
-        if selecao_filtro != "Todos":
-            df_filtrado = df_filtrado[df_filtrado["time"] == selecao_filtro]
+        # Passa por cada seleção cadastrada no banco que possui jogadores
+        times_com_atleta = df_jogadores["time"].unique()
+        
+        for time in TODOS_TIMES:
+            atletas_do_time = df_jogadores[df_jogadores["time"] == time]
             
-        for _, atleta in df_filtrado.iterrows():
-            with st.container():
-                c_ft, c_det = st.columns([1, 5])
-                with c_ft:
-                    st.image(obter_imagem_atleta(atleta["foto_jogador"]), width=100)
-                with c_det:
-                    nome_completo = atleta["nome"]
-                    apelido_atleta = f' "{atleta["apelido"]}"' if pd.notna(atleta["apelido"]) and str(atleta["apelido"]).strip() != "" else ""
-                    st.subheader(f"{nome_completo}{apelido_atleta}")
-                    if pd.notna(atleta["frase"]) and str(atleta["frase"]).strip() != "":
-                        st.markdown(f"*🗣️ \"{atleta['frase']}\"*")
-                    
-                    ci1, ci2, ci3, ci4 = st.columns(4)
-                    ci1.metric("Seleção", atleta["time"])
-                    ci2.metric("Posição", atleta["posicao"] if pd.notna(atleta["posicao"]) else "Não definida")
-                    ci3.metric("Idade", f"{int(atleta['idade'])} anos" if pd.notna(atleta['idade']) else "—")
-                    ci4.metric("Altura", f"{int(atleta['altura'])} cm" if pd.notna(atleta['altura']) else "—")
-            st.markdown("---")
+            # Só mostra a fileira se a seleção tiver pelo menos 1 jogador cadastrado
+            if not atletas_do_time.empty:
+                st.markdown(f"### {time}")
+                
+                # Cria 4 colunas horizontais fixas na tela (máximo de atletas por time)
+                colunas_fig = st.columns(4)
+                
+                # Distribui cada atleta em sua respectiva coluna na mesma linha
+                for idx, (_, atleta) in enumerate(atletas_do_time.reset_index().iterrows()):
+                    with colunas_fig[idx]:
+                        
+                        # Transforma a foto para string base64 para injetar direto no HTML da figurinha
+                        foto_bytes = obter_imagem_atleta(atleta["foto_jogador"])
+                        if isinstance(foto_bytes, bytes):
+                            base64_foto = base64.b64encode(foto_bytes).decode()
+                            img_src = f"data:image/png;base64,{base64_foto}"
+                        else:
+                            img_src = FOTO_PADRAO_URL
+
+                        apelido_atleta = atleta["apelido"] if pd.notna(atleta["apelido"]) and str(atleta["apelido"]).strip() != "" else atleta["nome"].split()[0]
+                        posicao_atleta = atleta["posicao"] if pd.notna(atleta["posicao"]) else "Geral"
+                        altura_atleta = f"{int(atleta['altura'])} cm" if pd.notna(atleta['altura']) else "—"
+                        idade_atleta = f"{int(atleta['idade'])} anos" if pd.notna(atleta['idade']) else "—"
+                        
+                        # --- DESIGN DA FIGURINHA EM HTML/CSS ---
+                        st.markdown(
+                            f"""
+                            <div style="
+                                background: linear-gradient(135deg, #ffe066 0%, #f59f00 100%);
+                                padding: 8px;
+                                border-radius: 10px;
+                                border: 3px solid #fff;
+                                box-shadow: 0px 6px 12px rgba(0,0,0,0.15);
+                                text-align: center;
+                                font-family: 'Arial Black', sans-serif;
+                                margin-bottom: 20px;
+                                width: 100%;
+                            ">
+                                <div style="display: flex; justify-content: space-between; font-size: 10px; color: #fff; font-weight: bold; background: rgba(0,0,0,0.2); padding: 2px 6px; border-radius: 4px; margin-bottom: 6px;">
+                                    <span>{pos_txt := posicao_atleta[:12]}</span>
+                                    <span>{altura_atleta}</span>
+                                </div>
+                                
+                                <div style="background: #fff; border-radius: 6px; padding: 3px; display: inline-block; width: 100%;">
+                                    <img src="{img_src}" style="width: 100%; height: 140px; object-fit: cover; border-radius: 4px;">
+                                </div>
+                                
+                                <div style="background: #1a1a1a; margin-top: 6px; padding: 4px; border-radius: 4px; border-bottom: 3px solid #ff4b4b;">
+                                    <div style="color: #fff; font-size: 13px; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                        {apelido_atleta}
+                                    </div>
+                                    <div style="color: #777; font-size: 9px; font-weight: normal; font-family: sans-serif;">
+                                        {idade_atleta} | {atleta['pontos']} pts
+                                    </div>
+                                </div>
+                            </div>
+                            """,
+                            unsafe_allow_html=True
+                        )
+                st.markdown("<br>", unsafe_allow_html=True)
     else:
-        st.info("Nenhum atleta cadastrado para exibir.")
+        st.info("Nenhum atleta cadastrado para montar o álbum.")
+
 
 # --- ABA 3: MODO CONFRONTO ---
 with aba_confronto:
