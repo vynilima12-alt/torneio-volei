@@ -181,9 +181,6 @@ with aba_elenco:
     st.header("📖 Álbum de Figurinhas Oficial — Copa 2026")
     
     if not df_jogadores.empty:
-        # Passa por cada seleção cadastrada no banco que possui jogadores
-        times_com_atleta = df_jogadores["time"].unique()
-        
         for time in TODOS_TIMES:
             atletas_do_time = df_jogadores[df_jogadores["time"] == time]
             
@@ -191,61 +188,65 @@ with aba_elenco:
             if not atletas_do_time.empty:
                 st.markdown(f"### {time}")
                 
-                # Cria 4 colunas horizontais fixas na tela (máximo de atletas por time)
+                # Cria 4 colunas horizontais fixas na tela
                 colunas_fig = st.columns(4)
                 
                 # Distribui cada atleta em sua respectiva coluna na mesma linha
                 for idx, (_, atleta) in enumerate(atletas_do_time.reset_index().iterrows()):
-                    with colunas_fig[idx]:
-                        
-                        # Transforma a foto para string base64 para injetar direto no HTML da figurinha
-                        foto_bytes = obter_imagem_atleta(atleta["foto_jogador"])
-                        if isinstance(foto_bytes, bytes):
-                            base64_foto = base64.b64encode(foto_bytes).decode()
-                            img_src = f"data:image/png;base64,{base64_foto}"
-                        else:
-                            img_src = FOTO_PADRAO_URL
+                    # Garante que não vai estourar o índice se houver mais de 4 cadastrados por erro
+                    if idx < 4:
+                        with colunas_fig[idx]:
+                            
+                            # Transforma a foto para string base64 para injetar direto no HTML
+                            foto_bytes = obter_imagem_atleta(atleta["foto_jogador"])
+                            if isinstance(foto_bytes, bytes):
+                                base64_foto = base64.b64encode(foto_bytes).decode()
+                                img_src = f"data:image/png;base64,{base64_foto}"
+                            else:
+                                img_src = FOTO_PADRAO_URL
 
-                        apelido_atleta = atleta["apelido"] if pd.notna(atleta["apelido"]) and str(atleta["apelido"]).strip() != "" else atleta["nome"].split()[0]
-                        posicao_atleta = atleta["posicao"] if pd.notna(atleta["posicao"]) else "Geral"
-                        altura_atleta = f"{int(atleta['altura'])} cm" if pd.notna(atleta['altura']) else "—"
-                        idade_atleta = f"{int(atleta['idade'])} anos" if pd.notna(atleta['idade']) else "—"
-                        
-                        # --- DESIGN DA FIGURINHA EM HTML/CSS ---
-                        st.markdown(
-                            f"""
-                            <div style="
-                                background: linear-gradient(135deg, #ffe066 0%, #f59f00 100%);
-                                padding: 8px;
-                                border-radius: 10px;
-                                border: 3px solid #fff;
-                                box-shadow: 0px 6px 12px rgba(0,0,0,0.15);
-                                text-align: center;
-                                font-family: 'Arial Black', sans-serif;
-                                margin-bottom: 20px;
-                                width: 100%;
-                            ">
-                                <div style="display: flex; justify-content: space-between; font-size: 10px; color: #fff; font-weight: bold; background: rgba(0,0,0,0.2); padding: 2px 6px; border-radius: 4px; margin-bottom: 6px;">
-                                    <span>{pos_txt := posicao_atleta[:12]}</span>
-                                    <span>{altura_atleta}</span>
-                                </div>
-                                
-                                <div style="background: #fff; border-radius: 6px; padding: 3px; display: inline-block; width: 100%;">
-                                    <img src="{img_src}" style="width: 100%; height: 140px; object-fit: cover; border-radius: 4px;">
-                                </div>
-                                
-                                <div style="background: #1a1a1a; margin-top: 6px; padding: 4px; border-radius: 4px; border-bottom: 3px solid #ff4b4b;">
-                                    <div style="color: #fff; font-size: 13px; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                                        {apelido_atleta}
+                            apelido_atleta = atleta["apelido"] if pd.notna(atleta["apelido"]) and str(atleta["apelido"]).strip() != "" else atleta["nome"].split()[0]
+                            posicao_atleta = atleta["posicao"] if pd.notna(atleta["posicao"]) else "Geral"
+                            altura_atleta = f"{int(atleta['altura'])} cm" if pd.notna(atleta['altura']) else "—"
+                            idade_atleta = f"{int(atleta['idade'])} anos" if pd.notna(atleta['idade']) else "—"
+                            pontos_atleta = int(atleta['pontos']) if pd.notna(atleta['pontos']) else 0
+                            
+                            # --- DESIGN DA FIGURINHA EM HTML/CSS ---
+                            st.markdown(
+                                f"""
+                                <div style="
+                                    background: linear-gradient(135deg, #ffe066 0%, #f59f00 100%);
+                                    padding: 10px;
+                                    border-radius: 12px;
+                                    border: 3px solid #fff;
+                                    box-shadow: 0px 6px 12px rgba(0,0,0,0.2);
+                                    text-align: center;
+                                    font-family: 'Arial Black', sans-serif;
+                                    margin-bottom: 15px;
+                                    width: 100%;
+                                    box-sizing: border-box;
+                                ">
+                                    <div style="display: flex; justify-content: space-between; font-size: 11px; color: #fff; font-weight: bold; background: rgba(0,0,0,0.25); padding: 3px 6px; border-radius: 4px; margin-bottom: 8px;">
+                                        <span>{posicao_atleta[:12].upper()}</span>
+                                        <span>{altura_atleta}</span>
                                     </div>
-                                    <div style="color: #777; font-size: 9px; font-weight: normal; font-family: sans-serif;">
-                                        {idade_atleta} | {atleta['pontos']} pts
+                                    
+                                    <div style="background: #fff; border-radius: 6px; padding: 2px; display: block; width: 100%; height: 150px; overflow: hidden;">
+                                        <img src="{img_src}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 4px;">
+                                    </div>
+                                    
+                                    <div style="background: #1a1a1a; margin-top: 8px; padding: 6px 4px; border-radius: 4px; border-bottom: 3px solid #ff4b4b;">
+                                        <div style="color: #fff; font-size: 13px; font-weight: 900; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: 0.5px;">
+                                            {apelido_atleta}
+                                        </div>
+                                        <div style="color: #aaa; font-size: 10px; font-weight: normal; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin-top: 2px;">
+                                            {idade_atleta} | <b style="color: #00ff00;">{pontos_atleta} pts</b>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                            """,
-                            unsafe_allow_html=True
-                        )
+                                """,
+                                unsafe_allow_html=True
+                            )
                 st.markdown("<br>", unsafe_allow_html=True)
     else:
         st.info("Nenhum atleta cadastrado para montar o álbum.")
