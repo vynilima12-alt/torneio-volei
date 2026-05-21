@@ -245,11 +245,18 @@ with aba_historico:
     if not df_partidas.empty:
         for _, partida in df_partidas.iterrows():
             with st.container():
+                # Forçamos a cor do texto para preto (#1e1e1e e #666666) para dar leitura perfeita no fundo claro
                 st.markdown(
                     f"""
-                    <div style="background-color: #f1f3f5; padding: 15px; border-radius: 8px; margin-bottom: 12px; border-left: 5px solid #228be6;">
-                        <h4>{partida['time_a']} <b>{partida['sets_a']}</b> x <b>{partida['sets_b']}</b> {partida['time_b']}</h4>
-                        <p style='color: gray; font-size: 14px;'>Resultados dos Sets: {partida['placar_sets']}</p>
+                    <div style="background-color: #ffffff; padding: 20px; border-radius: 12px; margin-bottom: 16px; border-left: 6px solid #ff4b4b; box-shadow: 0px 4px 6px rgba(0,0,0,0.05);">
+                        <h3 style='margin: 0; color: #1e1e1e; font-family: sans-serif; font-size: 20px;'>
+                            {partida['time_a']} <span style='color: #ff4b4b;'>{partida['sets_a']}</span> 
+                            <span style='color: #cccccc; font-size: 16px;'> x </span> 
+                            <span style='color: #ff4b4b;'>{partida['sets_b']}</span> {partida['time_b']}
+                        </h3>
+                        <p style='color: #666666; font-size: 15px; margin: 8px 0 0 0; font-family: sans-serif;'>
+                            📊 <b>Parciais:</b> {partida['placar_sets'] if partida['placar_sets'] else 'Sem parciais gravadas'}
+                        </p>
                     </div>
                     """, 
                     unsafe_allow_html=True
