@@ -195,85 +195,112 @@ with aba_ranking:
     else:
         st.info("Nenhum atleta cadastrado no torneio.")
 
-# --- ABA 2: ELENCO & FICHAS (MODO ALBUM DE FIGURINHAS REAL COMPACTADO) ---
+# --- ABA 2: ELENCO & FICHAS (MODO ÁLBUM DE FIGURINHAS CARROSSEL PREMIUM) ---
 with aba_elenco:
     st.header("📖 Álbum de Figurinhas Premium — Copa 2026")
     
+    # Injeta um estilo CSS rápido para sumir com as barras de rolagem feias do navegador, mantendo o deslize nativo
+    st.markdown(
+        """
+        <style>
+        .carrossel-container {
+            display: flex;
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            gap: 15px;
+            padding: 10px 5px 20px 5px;
+            scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
+        }
+        .carrossel-container::-webkit-scrollbar {
+            height: 6px;
+        }
+        .carrossel-container::-webkit-scrollbar-thumb {
+            background-color: #333;
+            border-radius: 10px;
+        }
+        </style>
+        """, 
+        unsafe_allow_html=True
+    )
+    
     if not df_jogadores.empty:
         for time in TODOS_TIMES:
-            # Filtra os atletas garantindo correspondência exata de string
             atletas_do_time = df_jogadores[df_jogadores["time"].str.strip() == time.strip()]
             
             if not atletas_do_time.empty:
                 st.markdown(f"### {time}")
-                colunas_fig = st.columns(4)
                 
-                # Coleta o link dinâmico da bandeira estilizada do país correspondente
-                link_fundo_time = LINKS_FUNDOS_LIMPOS.get(time, FOTO_PADRAO_URL)
+                # Criamos a abertura da nossa linha/carrossel em HTML
+                html_carrossel = '<div class="carrossel-container">'
                 
                 for idx, (_, atleta) in enumerate(atletas_do_time.reset_index().iterrows()):
-                    if idx < 4:
-                        with colunas_fig[idx]:
-                            
-                            # Tratamento direto e leve focado em links diretos de imagem (Postimages)
-                            dados_foto = atleta["foto_jogador"]
-                            if pd.isna(dados_foto) or str(dados_foto).strip() == "":
-                                img_src_atleta = FOTO_PADRAO_URL
-                            else:
-                                dados_foto_str = str(dados_foto).strip()
-                                
-                                # SE FOR LINK DIRETO (Postimages, etc), usa ele purinho sem alterar nada
-                                if dados_foto_str.startswith("http"):
-                                    img_src_atleta = dados_foto_str
-                                elif "base64," in dados_foto_str:
-                                    img_src_atleta = dados_foto_str
-                                else:
-                                    img_src_atleta = f"data:image/png;base64,{dados_foto_str}"
+                    # Link da bandeira estilizada do país
+                    link_fundo_time = LINKS_FUNDOS_LIMPOS.get(time, FOTO_PADRAO_URL)
+                    
+                    # Link da foto do jogador (Postimages direto)
+                    dados_foto = atleta["foto_jogador"]
+                    img_src_atleta = str(dados_foto).strip() if pd.notna(dados_foto) and str(dados_foto).strip() != "" else FOTO_PADRAO_URL
 
-                            # Variáveis do Card de Atleta
-                            apelido_atleta = atleta["apelido"] if pd.notna(atleta["apelido"]) and str(atleta["apelido"]).strip() != "" else atleta["nome"].split()[0]
-                            posicao_txt = str(atleta["posicao"]).upper() if pd.notna(atleta["posicao"]) else "S"
-                            
-                            # Mapeamento exato das posições para as siglas oficiais
-                            letra_posicao = "S"
-                            if "LEVANTADOR" in posicao_txt: letra_posicao = "LEV"
-                            elif "PONTEIRO" in posicao_txt: letra_posicao = "P"
-                            elif "LÍBERO" in posicao_txt or "LIBERO" in posicao_txt: letra_posicao = "L"
-                            elif "CENTRAL" in posicao_txt: letra_posicao = "C"
-                            elif "OPOSTO" in posicao_txt: letra_posicao = "OPP"
+                    # Variáveis do atleta
+                    apelido_atleta = atleta["apelido"] if pd.notna(atleta["apelido"]) and str(atleta["apelido"]).strip() != "" else atleta["nome"].split()[0]
+                    posicao_txt = str(atleta["posicao"]).upper() if pd.notna(atleta["posicao"]) else "S"
+                    
+                    # Mapeamento exato das posições para as siglas oficiais
+                    letra_posicao = "S"
+                    if "LEVANTADOR" in posicao_txt: letra_posicao = "LEV"
+                    elif "PONTEIRO" in posicao_txt: letra_posicao = "P"
+                    elif "LÍBERO" in posicao_txt or "LIBERO" in posicao_txt: letra_posicao = "L"
+                    elif "CENTRAL" in posicao_txt: letra_posicao = "C"
+                    elif "OPOSTO" in posicao_txt: letra_posicao = "OPP"
 
-                            altura_atleta = f"{int(atleta['altura'])} CM" if pd.notna(atleta['altura']) else "—"
-                            idade_atleta = f"{int(atleta['idade'])}" if pd.notna(atleta['idade']) else "—"
-                            
-                            # Exibe a frase real cadastrada no banco de dados
-                            frase_atleta = str(atleta["frase"]).upper() if pd.notna(atleta["frase"]) and str(atleta["frase"]).strip() != "" else "COPA DO MUNDO 2026"
-                            
-                            # HTML Ajustado: Foto vinda do Postimages renderizada perfeitamente por cima do Canva
-                            html_canva_premium = (
-                                f'<div style="width: 100%; height: 380px; border-radius: 8px; position: relative; overflow: hidden; font-family: \'Arial\', sans-serif; box-shadow: 0px 8px 16px rgba(0,0,0,0.4); border: 3px solid #ffffff;">'
-                                f'  '
-                                f'  <img src="{link_fundo_time}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1;">'
-                                f'  '
-                                f'  '
-                                f'  <div style="position: absolute; top: 12px; left: 12px; background: linear-gradient(180deg, #ffffff 0%, #cccccc 100%); min-width: 38px; padding: 0 5px; height: 42px; display: flex; align-items: center; justify-content: center; box-shadow: 2px 2px 5px rgba(0,0,0,0.3); z-index: 10; border-radius: 2px;">'
-                                f'    <span style="color: #1b47ff; font-size: 15px; font-weight: 900;">{letra_posicao}</span>'
-                                f'  </div>'
-                                f'  '
-                                f'  '
-                                f'  <div style="position: absolute; bottom: 85px; left: 0; width: 100%; height: 55%; display: flex; align-items: flex-end; justify-content: center; z-index: 5;">'
-                                f'    <img src="{img_src_atleta}" style="width: auto; max-width: 90%; height: 100%; object-fit: contain;">'
-                                f'  </div>'
-                                f'  '
-                                f'  '
-                                f'  <div style="position: absolute; bottom: 0; left: 0; width: 100%; background: linear-gradient(180deg, #ffffff 0%, #f2f2f2 100%); padding: 12px 5px; text-align: center; box-sizing: border-box; border-top: 2px solid #ffffff; z-index: 12;">'
-                                f'    <div style="color: #1b47ff; font-size: 20px; font-weight: 900; text-transform: uppercase; letter-spacing: -0.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.1;">{apelido_atleta}</div>'
-                                f'    <div style="color: #1b47ff; font-size: 11px; font-weight: bold; margin-top: 3px; letter-spacing: 0.5px;">{idade_atleta} | {altura_atleta}</div>'
-                                f'    <div style="color: #1b47ff; font-size: 9px; font-weight: 800; margin-top: 6px; font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 6px;">\"{frase_atleta}\"</div>'
-                                f'  </div>'
-                                f'</div>'
-                            )
-                            st.markdown(html_canva_premium, unsafe_allow_html=True)
+                    altura_atleta = f"{int(atleta['altura'])} CM" if pd.notna(atleta['altura']) else "—"
+                    idade_atleta = f"{int(atleta['idade'])}" if pd.notna(atleta['idade']) else "—"
+                    frase_atleta = str(atleta["frase"]).upper() if pd.notna(atleta["frase"]) and str(atleta["frase"]).strip() != "" else "COPA DO MUNDO 2026"
+                    
+                    # Monta cada figurinha (Proporção perfeita 2:3 -> 200px x 300px)
+                    html_carrossel += (
+                        f'<div style="'
+                        f'  flex: 0 0 auto; '
+                        f'  width: 200px; '
+                        f'  height: 300px; '
+                        f'  border-radius: 6px; '
+                        f'  position: relative; '
+                        f'  overflow: hidden; '
+                        f'  font-family: \'Arial\', sans-serif; '
+                        f'  box-shadow: 0px 6px 12px rgba(0,0,0,0.5);'
+                        f'">'
+                        f'  '
+                        f'  <img src="{link_fundo_time}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1;">'
+                        f'  '
+                        f'  '
+                        f'  <div style="position: absolute; top: 8px; left: 8px; background: linear-gradient(180deg, #ffffff 0%, #cccccc 100%); min-width: 28px; padding: 0 4px; height: 32px; display: flex; align-items: center; justify-content: center; box-shadow: 1px 1px 4px rgba(0,0,0,0.4); z-index: 10; border-radius: 2px;">'
+                        f'    <span style="color: #1b47ff; font-size: 13px; font-weight: 900;">{letra_posicao}</span>'
+                        f'  </div>'
+                        f'  '
+                        f'  '
+                        f'  <div style="position: absolute; bottom: 0; left: 0; width: 100%; height: 75%; display: flex; align-items: flex-end; justify-content: center; z-index: 5; padding-bottom: 60px; box-sizing: border-box;">'
+                        f'    <img src="{img_src_atleta}" style="width: auto; max-width: 95%; height: 100%; object-fit: contain;">'
+                        f'  </div>'
+                        f'  '
+                        f'  '
+                        f'  <div style="position: absolute; bottom: 0; left: 0; width: 100%; background: linear-gradient(0deg, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.7) 75%, rgba(0,0,0,0) 100%); padding: 15px 5px 8px 5px; text-align: center; box-sizing: border-box; z-index: 12;">'
+                        f'    <div style="color: #ffffff; font-size: 15px; font-weight: 900; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.1; text-shadow: 1px 1px 2px #000;">{apelido_atleta}</div>'
+                        f'    <div style="color: #bbbbbb; font-size: 10px; font-weight: bold; margin-top: 2px; text-shadow: 1px 1px 1px #000;">{idade_atleta} ANOS | {altura_atleta}</div>'
+                        f'    <div style="color: #00ff00; font-size: 8px; font-weight: 800; margin-top: 4px; font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 4px; text-shadow: 1px 1px 1px #000;">\"{frase_atleta}\"</div>'
+                        f'  </div>'
+                        f'</div>'
+                    )
+                
+                # Fecha a div do carrossel deste país
+                html_carrossel += '</div>'
+                
+                # Renderiza o carrossel completo no Streamlit
+                st.markdown(html_carrossel, unsafe_allow_html=True)
                 st.markdown("<br>", unsafe_allow_html=True)
+    else:
+        st.info("Nenhum atleta cadastrado para montar o álbum.")
+
 
 # --- ABA 3: MODO CONFRONTO ---
 with aba_confronto:
