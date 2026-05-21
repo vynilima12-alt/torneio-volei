@@ -13,10 +13,12 @@ st.title("🏐 Copa do Mundo de Vôlei 2026 — Gestão de Confrontos")
 
 FOTO_PADRAO_URL = "https://cdn-icons-png.flaticon.com/512/4333/4333609.png"
 
-# Definição dos Grupos e Times Oficiais
+# Definição das Seleções Oficiais
 GRUPO_A = ["🇧🇷 Brasil", "🇺🇸 EUA", "🇫🇷 França", "🇯🇵 Japão"]
 GRUPO_B = ["🇩🇪 Alemanha", "🇦🇷 Argentina", "🇪🇸 Espanha", "🇵🇹 Portugal"]
 TODOS_TIMES = GRUPO_A + GRUPO_B
+
+LISTA_POSICOES = ["Ponteiro(a)", "Central", "Levantador(a)", "Oposto(a)", "Líbero"]
 
 SUPABASE_URL = st.secrets["connections"]["supabase"]["url"]
 SUPABASE_KEY = st.secrets["connections"]["supabase"]["key"]
@@ -30,12 +32,16 @@ def carregar_dados_banco():
         response = supabase.table("jogadores").select("*").execute()
         if response.data:
             df = pd.DataFrame(response.data)
+            # Garante a existência das novas colunas na tabela local do Pandas
+            for col in ["apelido", "idade", "posicao", "altura", "frase"]:
+                if col not in df.columns:
+                    df[col] = None
             if "id" in df.columns:
                 return df.sort_values(by="id").reset_index(drop=True)
             return df.sort_values(by="nome").reset_index(drop=True)
-        return pd.DataFrame(columns=["id", "nome", "time", "pontos", "foto_time", "foto_jogador"])
+        return pd.DataFrame(columns=["id", "nome", "apelido", "time", "pontos", "foto_time", "foto_jogador", "idade", "posicao", "altura", "frase"])
     except Exception:
-        return pd.DataFrame(columns=["id", "nome", "time", "pontos", "foto_time", "foto_jogador"])
+        return pd.DataFrame(columns=["id", "nome", "apelido", "time", "pontos", "foto_time", "foto_jogador", "idade", "posicao", "altura", "frase"])
 
 def carregar_partidas_banco():
     try:
@@ -48,15 +54,17 @@ def carregar_partidas_banco():
     
 def atualizar_partida_banco(partida_id, sets_a, sets_b, placar_sets):
     try:
-        dados = {
-            "sets_a": sets_a,
-            "sets_b": sets_b,
-            "placar_sets": placar_sets
-        }
+        dados = {"sets_a": sets_a, "sets_b": sets_b, "placar_sets": placar_sets}
         supabase.table("partidas").update(dados).eq("id", partida_id).execute()
         return True
-    except Exception as e:
-        st.error(f"Erro ao atualizar partida: {e}")
+    except Exception:
+        return False
+
+def deletar_partida_banco(partida_id):
+    try:
+        supabase.table("partidas").delete().eq("id", partida_id).execute()
+        return True
+    except Exception:
         return False
 
 def salvar_partida_e_estatisticas(time_a, time_b, sets_a, sets_b, string_sets, pontos_partida_dict):
@@ -75,13 +83,15 @@ def salvar_partida_e_estatisticas(time_a, time_b, sets_a, sets_b, string_sets, p
                     novo_total = pontos_atuais + pontos_ganhos
                     supabase.table("jogadores").update({"pontos": novo_total}).eq("id", jogador_id).execute()
         return True
-    except Exception as e:
-        st.error(f"Erro ao computar dados no banco: {e}")
+    except Exception:
         return False
 
-def inserir_jogador_banco(nome, time, emoji, foto_base64):
+def inserir_jogador_banco(nome, apelido, time, emoji, foto_base64, idade, posicao, altura, frase):
     try:
-        dados = {"nome": nome, "time": time, "foto_time": emoji, "foto_jogador": foto_base64, "pontos": 0}
+        dados = {
+            "nome": nome, "apelido": apelido, "time": time, "foto_time": emoji, "foto_jogador": foto_base64, 
+            "pontos": 0, "idade": idade, "posicao": posicao, "altura": altura, "frase": frase
+        }
         supabase.table("jogadores").insert(dados).execute()
         return True
     except Exception:
@@ -94,17 +104,15 @@ def deletar_jogador_banco(jogador_id):
     except Exception:
         return False
 
-def editar_jogador_banco(jogador_id, novo_nome, novo_time, novo_emoji):
+def editar_jogador_banco(jogador_id, novo_nome, novo_apelido, novo_time, novo_emoji, nova_idade, nova_posicao, nova_altura, nova_frase):
     try:
         dados = {
-            "nome": novo_nome,
-            "time": novo_time,
-            "foto_time": novo_emoji
+            "nome": novo_nome, "apelido": novo_apelido, "time": novo_time, "foto_time": novo_emoji,
+            "idade": nova_idade, "posicao": nova_posicao, "altura": nova_altura, "frase": nova_frase
         }
         supabase.table("jogadores").update(dados).eq("id", jogador_id).execute()
         return True
-    except Exception as e:
-        st.error(f"Erro ao atualizar cadastro no banco: {e}")
+    except Exception:
         return False
 
 def converter_imagem_para_base64(arquivo_imagem):
@@ -113,19 +121,15 @@ def converter_imagem_para_base64(arquivo_imagem):
         img = ImageOps.fit(img, (150, 150), Image.Resampling.LANCZOS)
         buffered = io.BytesIO()
         img.save(buffered, format="PNG")
-        # Retorna apenas a string de texto base64 pura
         return base64.b64encode(buffered.getvalue()).decode()
     return ""
 
 def obter_imagem_atleta(dados_foto):
-    """Tratamento seguro que converte Base64 em bytes legíveis para o st.image"""
     if pd.isna(dados_foto) or str(dados_foto).strip() == "":
         return FOTO_PADRAO_URL
-    
     dados_foto_str = str(dados_foto).strip()
     if "base64," in dados_foto_str:
         dados_foto_str = dados_foto_str.split("base64,")[1]
-        
     try:
         return base64.b64decode(dados_foto_str)
     except Exception:
@@ -137,8 +141,9 @@ df_partidas = carregar_partidas_banco()
 # =========================================================
 # 3. INTERFACE INTERATIVA (ABAS)
 # =========================================================
-aba_ranking, aba_confronto, aba_historico, aba_admin = st.tabs([
+aba_ranking, aba_elenco, aba_confronto, aba_historico, aba_admin = st.tabs([
     "📊 Classificação & Estatísticas", 
+    "🏃‍♂️ Elenco & Fichas",
     "⚔️ Modo Confronto", 
     "📜 Histórico de Jogos",
     "🔒 Painel Admin"
@@ -157,24 +162,57 @@ with aba_ranking:
         with col2:
             st.header("🔥 Artilharia Individual (MVP)")
             ranking_jogadores = df_jogadores.sort_values(by="pontos", ascending=False).copy()
-            
-            # Formata temporariamente o base64 com prefixo exigido pela tabela do Streamlit
             ranking_jogadores["foto_jogador"] = ranking_jogadores["foto_jogador"].apply(
                 lambda x: f"data:image/png;base64,{str(x).split('base64,')[-1]}" if pd.notna(x) and str(x).strip() != "" and not str(x).startswith("http") else (x if pd.notna(x) else FOTO_PADRAO_URL)
             )
             
+            # Mostra o Apelido no ranking se ele existir, se não mostra o nome
+            ranking_jogadores["exibir_nome"] = ranking_jogadores["apelido"].fillna(ranking_jogadores["nome"])
+            
             st.dataframe(
-                ranking_jogadores[["foto_jogador", "nome", "time", "pontos"]],
+                ranking_jogadores[["foto_jogador", "exibir_nome", "time", "pontos"]],
                 column_config={
                     "foto_jogador": st.column_config.ImageColumn("Perfil", width="small"),
-                    "nome": "Atleta", "time": "Seleção", "pontos": "Pontos Totais"
+                    "exibir_nome": "Atleta", "time": "Seleção", "pontos": "Pontos Totais"
                 },
                 hide_index=True, use_container_width=True
             )
     else:
         st.info("Nenhum atleta cadastrado no torneio.")
 
-# --- ABA 2: MODO CONFRONTO ---
+# --- ABA 2: ELENCO & FICHAS ---
+with aba_elenco:
+    st.header("🏃‍♂️ Informações Detalhadas dos Atletas")
+    if not df_jogadores.empty:
+        selecao_filtro = st.selectbox("Filtrar por Seleção:", options=["Todos"] + TODOS_TIMES)
+        
+        df_filtrado = df_jogadores.copy()
+        if selecao_filtro != "Todos":
+            df_filtrado = df_filtrado[df_filtrado["time"] == selecao_filtro]
+            
+        for _, atleta in df_filtrado.iterrows():
+            with st.container():
+                c_ft, c_det = st.columns([1, 5])
+                with c_ft:
+                    st.image(obter_imagem_atleta(atleta["foto_jogador"]), width=100)
+                with c_det:
+                    nome_completo = atleta["nome"]
+                    apelido_atleta = f' "{atleta["apelido"]}"' if pd.notna(atleta["apelido"]) and str(atleta["apelido"]).strip() != "" else ""
+                    st.subheader(f"{nome_completo}{apelido_atleta}")
+                    
+                    if pd.notna(atleta["frase"]) and str(atleta["frase"]).strip() != "":
+                        st.markdown(f"*🗣️ \"{atleta['frase']}\"*")
+                    
+                    ci1, ci2, ci3, ci4 = st.columns(4)
+                    ci1.metric("Seleção", atleta["time"])
+                    ci2.metric("Posição", atleta["posicao"] if pd.notna(atleta["posicao"]) else "Não definida")
+                    ci3.metric("Idade", f"{int(atleta['idade'])} anos" if pd.notna(atleta['idade']) else "—")
+                    ci4.metric("Altura", f"{int(atleta['altura'])} cm" if pd.notna(atleta['altura']) else "—")
+            st.markdown("---")
+    else:
+        st.info("Nenhum atleta cadastrado para exibir.")
+
+# --- ABA 3: MODO CONFRONTO ---
 with aba_confronto:
     st.header("⚔️ Gerenciar Partida em Tempo Real")
     
@@ -203,7 +241,6 @@ with aba_confronto:
             st.session_state.placar_set_b = 0
             st.session_state.partida_ativa = True
 
-        # --- TELÃO DO PLACAR ESTILIZADO ---
         st.markdown(
             f"""
             <div style="background-color: #1a1a1a; padding: 25px; border-radius: 15px; border: 3px solid #ff4b4b; text-align: center; margin-bottom: 25px; box-shadow: 0px 8px 16px rgba(0,0,0,0.3);">
@@ -239,10 +276,11 @@ with aba_confronto:
                 j_id = row["id"]
                 c_img, c_txt, c_btn = st.columns([1, 2, 1])
                 with c_img:
-                    # Correção aplicada: conversão limpa para bytes brutos
                     st.image(obter_imagem_atleta(row["foto_jogador"]), width=60)
                 with c_txt:
-                    st.markdown(f"**{row['nome']}**")
+                    nome_quadra = row["apelido"] if pd.notna(row["apelido"]) and str(row["apelido"]).strip() != "" else row["nome"]
+                    pos_txt = f" ({row['posicao']})" if pd.notna(row['posicao']) else ""
+                    st.markdown(f"**{nome_quadra}**{pos_txt}")
                     st.caption(f"Pontos no jogo: {st.session_state.pontos_jogo_locais.get(j_id, 0)}")
                 with c_btn:
                     if st.button("➕ Ponto", key=f"ponto_a_{j_id}"):
@@ -256,10 +294,11 @@ with aba_confronto:
                 j_id = row["id"]
                 c_img, c_txt, c_btn = st.columns([1, 2, 1])
                 with c_img:
-                    # Correção aplicada: conversão limpa para bytes brutos
                     st.image(obter_imagem_atleta(row["foto_jogador"]), width=60)
                 with c_txt:
-                    st.markdown(f"**{row['nome']}**")
+                    nome_quadra = row["apelido"] if pd.notna(row["apelido"]) and str(row["apelido"]).strip() != "" else row["nome"]
+                    pos_txt = f" ({row['posicao']})" if pd.notna(row['posicao']) else ""
+                    st.markdown(f"**{nome_quadra}**{pos_txt}")
                     st.caption(f"Pontos no jogo: {st.session_state.pontos_jogo_locais.get(j_id, 0)}")
                 with c_btn:
                     if st.button("➕ Ponto", key=f"ponto_b_{j_id}"):
@@ -300,10 +339,9 @@ with aba_confronto:
                 del st.session_state.partida_ativa
             st.rerun()
 
-# --- ABA 3: HISTÓRICO DE JOGOS ---
+# --- ABA 4: HISTÓRICO DE JOGOS ---
 with aba_historico:
     st.header("📜 Histórico de Partidas Realizadas")
-    
     is_admin = st.session_state.get("admin_logado", False)
     
     if not df_partidas.empty:
@@ -327,7 +365,7 @@ with aba_historico:
             )
             
             if is_admin:
-                with st.expander(f"🛠️ Editar resultado da partida #{p_id}"):
+                with st.expander(f"🛠️ Modificar Partida #{p_id}"):
                     c_ed1, c_ed2, c_ed3 = st.columns([1, 1, 2])
                     with c_ed1:
                         novos_sets_a = st.number_input(f"Sets {partida['time_a']}:", min_value=0, max_value=3, value=int(partida['sets_a']), key=f"set_a_{p_id}")
@@ -336,15 +374,22 @@ with aba_historico:
                     with c_ed3:
                         novas_parciais = st.text_input("Parciais (Ex: 15-12, 13-15):", value=str(partida['placar_sets']), key=f"parciais_{p_id}")
                     
-                    if st.button("💾 Atualizar Placar", key=f"btn_update_partida_{p_id}", type="primary"):
-                        if atualizar_partida_banco(p_id, novos_sets_a, novos_sets_b, novas_parciais):
-                            st.success("Partida corrigida com sucesso!")
-                            st.rerun()
+                    cb_at, cb_ex = st.columns(2)
+                    with cb_at:
+                        if st.button("💾 Atualizar Placar", key=f"btn_update_partida_{p_id}", type="primary", use_container_width=True):
+                            if atualizar_partida_banco(p_id, novos_sets_a, novos_sets_b, novas_parciais):
+                                st.success("Partida corrigida!")
+                                st.rerun()
+                    with cb_ex:
+                        if st.button("🗑️ Excluir Partida", key=f"btn_delete_partida_{p_id}", type="secondary", use_container_width=True):
+                            if deletar_partida_banco(p_id):
+                                st.success("Partida removida!")
+                                st.rerun()
             st.markdown("<br>", unsafe_allow_html=True)
     else:
         st.info("Nenhum jogo registrado no histórico.")
 
-# --- ABA 4: ADMINISTRAÇÃO ---
+# --- ABA 5: ADMINISTRAÇÃO ---
 with aba_admin:
     senha = st.text_input("Senha Master:", type="password")
     if senha == "volei123":
@@ -352,29 +397,44 @@ with aba_admin:
         st.success("Acesso administrativo liberado.")
         
         # ==========================================
-        # 1. BLOCO DE CADASTRO
+        # FORMULÁRIO COMPACTO DE CADASTRO (ADAPTADO FORMS)
         # ==========================================
         st.markdown("---")
-        st.subheader("Adicionar Novo Atleta ao Torneio")
-        nome_novo = st.text_input("Nome completo do jogador:")
-        time_novo = st.selectbox("Seleção do Jogador (Time Fixo):", options=TODOS_TIMES)
-        arquivo_foto = st.file_uploader("Foto do atleta:", type=["png", "jpg", "jpeg"])
-
-        if st.button("Confirmar Cadastro"):
-            qtd_atual = len(df_jogadores[df_jogadores["time"] == time_novo])
-            if qtd_atual >= 4:
-                st.error(f"A seleção do {time_novo} já atingiu o limite máximo de 4 jogadores cadastrados.")
-            elif nome_novo:
-                emoji_flag = time_novo.split()[0]
-                string_foto = converter_imagem_para_base64(arquivo_foto)
-                if inserir_jogador_banco(nome_novo, time_novo, emoji_flag, string_foto):
-                    st.success(f"{nome_novo} adicionado ao {time_novo}!")
-                    st.rerun()
-            else:
-                st.error("Por favor, digite o nome do jogador.")
+        st.subheader("➕ Cadastrar Jogador (Manual/Backup)")
+        
+        with st.form("form_cadastro_jogador", clear_on_submit=True):
+            nome_novo = st.text_input("Nome completo:")
+            apelido_novo = st.text_input("Apelido / Nome no Ranking:")
+            time_novo = st.selectbox("Seleção Fixa:", options=TODOS_TIMES)
+            
+            c_cad1, c_cad2, c_cad3 = st.columns(3)
+            with c_cad1:
+                idade_nova = st.number_input("Idade:", min_value=12, max_value=60, value=22)
+            with c_cad2:
+                posicao_nova = st.selectbox("Gosta de jogar de:", options=LISTA_POSICOES)
+            with c_cad3:
+                altura_nova = st.number_input("Altura estimada (em cm):", min_value=120, max_value=230, value=185, step=1)
+                
+            frase_nova = st.text_area("Frase que te define:")
+            arquivo_foto = st.file_uploader("Foto para o perfil:", type=["png", "jpg", "jpeg"])
+            
+            botao_cadastrar = st.form_submit_button("Confirmar Cadastro", type="primary")
+            
+            if botao_cadastrar:
+                qtd_atual = len(df_jogadores[df_jogadores["time"] == time_novo])
+                if qtd_atual >= 4:
+                    st.error(f"A seleção do {time_novo} já atingiu o limite de 4 jogadores.")
+                elif nome_novo:
+                    emoji_flag = time_novo.split()[0]
+                    string_foto = converter_imagem_para_base64(arquivo_foto)
+                    if inserir_jogador_banco(nome_novo, apelido_novo, time_novo, emoji_flag, string_foto, idade_nova, posicao_nova, altura_nova, frase_nova):
+                        st.success(f"Atleta {nome_novo} gravado com sucesso!")
+                        st.rerun()
+                else:
+                    st.error("O nome é obrigatório.")
 
         # ==========================================
-        # 2. BLOCO DE EDIÇÃO
+        # FORMULÁRIO DE EDIÇÃO DE CADASTROS (ADAPTADO FORMS)
         # ==========================================
         st.markdown("---")
         st.subheader("🛠️ Editar Cadastro de Atleta")
@@ -383,22 +443,40 @@ with aba_admin:
             dados_atleta = df_jogadores[df_jogadores["nome"] == jogador_editar].iloc[0]
             id_atleta = dados_atleta["id"]
 
-            col_ed1, col_ed2 = st.columns(2)
-            with col_ed1:
-                nome_editado = st.text_input("Editar Nome:", value=dados_atleta["nome"], key=f"edit_nome_{id_atleta}")
-            with col_ed2:
-                time_editado = st.selectbox("Mudar Seleção:", options=TODOS_TIMES, index=TODOS_TIMES.index(dados_atleta["time"]), key=f"edit_time_{id_atleta}")
+            with st.form(f"form_edicao_{id_atleta}"):
+                col_ed1, col_ed2 = st.columns(2)
+                with col_ed1:
+                    nome_editado = st.text_input("Editar Nome:", value=dados_atleta["nome"])
+                with col_ed2:
+                    apelido_editado = st.text_input("Editar Apelido:", value=dados_atleta["apelido"] if pd.notna(dados_atleta["apelido"]) else "")
 
-            if st.button("💾 Salvar Alterações", type="primary", key=f"btn_salvar_{id_atleta}"):
-                emoji_novo = time_editado.split()[0]
-                if editar_jogador_banco(id_atleta, nome_editado, time_editado, emoji_novo):
-                    st.success("Cadastro atualizado com sucesso!")
-                    st.rerun()
+                time_editado = st.selectbox("Mudar Seleção:", options=TODOS_TIMES, index=TODOS_TIMES.index(dados_atleta["time"]))
+
+                col_ed3, col_ed4, col_ed5 = st.columns(3)
+                with col_ed3:
+                    val_idade = int(dados_atleta["idade"]) if pd.notna(dados_atleta["idade"]) else 22
+                    idade_editada = st.number_input("Editar Idade:", min_value=12, max_value=60, value=val_idade)
+                with col_ed4:
+                    val_pos = dados_atleta["posicao"] if pd.notna(dados_atleta["posicao"]) and dados_atleta["posicao"] in LISTA_POSICOES else LISTA_POSICOES[0]
+                    posicao_editada = st.selectbox("Editar Gosta de jogar de:", options=LISTA_POSICOES, index=LISTA_POSICOES.index(val_pos))
+                with col_ed5:
+                    val_alt = int(dados_atleta["altura"]) if pd.notna(dados_atleta["altura"]) else 185
+                    altura_editada = st.number_input("Editar Altura (cm):", min_value=120, max_value=230, value=val_alt, step=1)
+
+                frase_editada = st.text_area("Editar Frase que te define:", value=dados_atleta["frase"] if pd.notna(dados_atleta["frase"]) else "")
+
+                botao_salvar = st.form_submit_button("💾 Salvar Alterações", type="primary")
+                
+                if botao_salvar:
+                    emoji_novo = time_editado.split()[0]
+                    if editar_jogador_banco(id_atleta, nome_editado, apelido_editado, time_editado, emoji_novo, idade_editada, posicao_editada, altura_editada, frase_editada):
+                        st.success("Cadastro atualizado com sucesso!")
+                        st.rerun()
         else:
             st.info("Nenhum atleta cadastrado para edição.")
 
         # ==========================================
-        # 3. BLOCO DE EXCLUSÃO
+        # BLOCO DE EXCLUSÃO
         # ==========================================
         st.markdown("---")
         st.subheader("🗑️ Remover Atleta do Torneio")
