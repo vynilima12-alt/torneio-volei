@@ -6,7 +6,7 @@ import io
 from supabase import create_client, Client
 
 # =========================================================
-# 1. CONFIGURAÇÕES DA PÁGINA
+# 1. CONFIGURAÇÕES DA PÁGINA & CONSTANTES
 # =========================================================
 st.set_page_config(page_title="Copa do Mundo de Vôlei 2026", layout="wide")
 st.title("🏐 Copa do Mundo de Vôlei 2026 — Gestão de Confrontos")
@@ -19,6 +19,18 @@ GRUPO_B = ["🇩🇪 Alemanha", "🇦🇷 Argentina", "🇪🇸 Espanha", "🇵�
 TODOS_TIMES = GRUPO_A + GRUPO_B
 
 LISTA_POSICOES = ["Ponteiro(a)", "Central", "Levantador(a)", "Oposto(a)", "Líbero"]
+
+# Links diretos dos PNGs limpos do Canva hospedados no Imgur
+LINKS_FUNDOS_LIMPOS = {
+    "🇧🇷 Brasil": "https://i.imgur.com/twomOPg.png",
+    "🇺🇸 EUA": "https://i.imgur.com/dq2MoW7.png",
+    "🇫🇷 França": "https://i.imgur.com/BTszNIS.png",
+    "🇯🇵 Japão": "https://i.imgur.com/XWFPcH0.png",
+    "🇩🇪 Alemanha": "https://i.imgur.com/Go6KygO.png",
+    "🇦🇷 Argentina": "https://i.imgur.com/VUf5oCx.png",
+    "🇪🇸 Espanha": "https://i.imgur.com/nYwbcCS.png",
+    "🇵🇹 Portugal": "https://i.imgur.com/96OtRQS.png",
+}
 
 SUPABASE_URL = st.secrets["connections"]["supabase"]["url"]
 SUPABASE_KEY = st.secrets["connections"]["supabase"]["key"]
@@ -176,9 +188,9 @@ with aba_ranking:
     else:
         st.info("Nenhum atleta cadastrado no torneio.")
 
-# --- ABA 2: ELENCO & FICHAS (MODO ALBUM DE FIGURINHAS) ---
+# --- ABA 2: ELENCO & FICHAS (MODO ALBUM DE FIGURINHAS CANVA PREMIUM) ---
 with aba_elenco:
-    st.header("📖 Álbum de Figurinhas Oficial — Copa 2026")
+    st.header("📖 Álbum de Figurinhas Premium — Copa 2026")
     
     if not df_jogadores.empty:
         for time in TODOS_TIMES:
@@ -186,47 +198,52 @@ with aba_elenco:
             
             if not atletas_do_time.empty:
                 st.markdown(f"### {time}")
-                
                 colunas_fig = st.columns(4)
+                link_fundo_time = LINKS_FUNDOS_LIMPOS.get(time, FOTO_PADRAO_URL)
                 
                 for idx, (_, atleta) in enumerate(atletas_do_time.reset_index().iterrows()):
                     if idx < 4:
                         with colunas_fig[idx]:
-                            
                             foto_bytes = obter_imagem_atleta(atleta["foto_jogador"])
                             if isinstance(foto_bytes, bytes):
                                 base64_foto = base64.b64encode(foto_bytes).decode()
-                                img_src = f"data:image/png;base64,{base64_foto}"
+                                img_src_atleta = f"data:image/png;base64,{base64_foto}"
                             else:
-                                img_src = FOTO_PADRAO_URL
+                                img_src_atleta = "https://cdn-icons-png.flaticon.com/512/5351/5351307.png"
 
                             apelido_atleta = atleta["apelido"] if pd.notna(atleta["apelido"]) and str(atleta["apelido"]).strip() != "" else atleta["nome"].split()[0]
-                            posicao_atleta = str(atleta["posicao"]).upper() if pd.notna(atleta["posicao"]) else "GERAL"
-                            altura_atleta = f"{int(atleta['altura'])} cm" if pd.notna(atleta['altura']) else "—"
-                            idade_atleta = f"{int(atleta['idade'])} anos" if pd.notna(atleta['idade']) else "—"
-                            pontos_atleta = int(atleta['pontos']) if pd.notna(atleta['pontos']) else 0
+                            posicao_txt = str(atleta["posicao"]).upper() if pd.notna(atleta["posicao"]) else "S"
+                            letra_posicao = posicao_txt[0] if posicao_txt else "S"
+                            if "LEVANTADOR" in posicao_txt: letra_posicao = "L"
+                            elif "PONTEIRO" in posicao_txt: letra_posicao = "P"
+                            elif "LÍBERO" in posicao_txt or "LIBERO" in posicao_txt: letra_posicao = "L"
+                            elif "CENTRAL" in posicao_txt: letra_posicao = "C"
+                            elif "OPOSTO" in posicao_txt: letra_posicao = "O"
+
+                            altura_atleta = f"{int(atleta['altura'])} CM" if pd.notna(atleta['altura']) else "—"
+                            idade_atleta = f"{int(atleta['idade'])}" if pd.notna(atleta['idade']) else "—"
+                            frase_atleta = str(atleta["frase"]).upper() if pd.notna(atleta["frase"]) and str(atleta["frase"]).strip() != "" else "WE'RE GONNA TAKE THE POWER BACK"
                             
-                            # HTML compactado em uma única linha corrida para obrigar o Streamlit a renderizar o CSS
-                            html_figurinha = (
-                                f'<div style="background: linear-gradient(135deg, #ffe066 0%, #f59f00 100%); padding: 10px; border-radius: 12px; border: 3px solid #fff; box-shadow: 0px 6px 12px rgba(0,0,0,0.2); text-align: center; font-family: sans-serif; width: 100%; box-sizing: border-box;">'
-                                f'<div style="display: flex; justify-content: space-between; font-size: 11px; color: #fff; font-weight: bold; background: rgba(0,0,0,0.25); padding: 3px 6px; border-radius: 4px; margin-bottom: 8px;">'
-                                f'<span>{posicao_atleta[:12]}</span><span>{altura_atleta}</span>'
-                                f'</div>'
-                                f'<div style="background: #fff; border-radius: 6px; padding: 2px; display: block; width: 100%; height: 150px; overflow: hidden;">'
-                                f'<img src="{img_src}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 4px;">'
-                                f'</div>'
-                                f'<div style="background: #1a1a1a; margin-top: 8px; padding: 6px 4px; border-radius: 4px; border-bottom: 3px solid #ff4b4b;">'
-                                f'<div style="color: #fff; font-size: 13px; font-weight: bold; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: 0.5px;">{apelido_atleta}</div>'
-                                f'<div style="color: #aaa; font-size: 10px; font-weight: normal; margin-top: 2px;">{idade_atleta} | <b style="color: #00ff00;">{pontos_atleta} pts</b></div>'
-                                f'</div>'
+                            html_canva_premium = (
+                                f'<div style="width: 100%; aspect-ratio: 3 / 4; border-radius: 4px; box-shadow: 0px 8px 20px rgba(0,0,0,0.3); position: relative; overflow: hidden; font-family: \'Arial\', sans-serif; margin-bottom: 20px;">'
+                                f'  <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-image: url(\"{link_fundo_time}\"); background-size: cover; background-position: center; z-index: 1;"></div>'
+                                f'  <div style="position: absolute; top: 10px; left: 10px; background: linear-gradient(180deg, #ffffff 0%, #cccccc 100%); width: 35px; height: 45px; display: flex; align-items: center; justify-content: center; z-index: 2; box-shadow: 2px 2px 5px rgba(0,0,0,0.2);">'
+                                f'    <span style="color: #1b47ff; font-size: 24px; font-weight: 900;">{letra_posicao}</span>'
+                                f'  </div>'
+                                f'  <div style="position: absolute; top: 0; left: 0; width: 100%; height: 80%; z-index: 3; display: flex; align-items: center; justify-content: center;">'
+                                f'    <img src="{img_src_atleta}" style="max-width: 90%; max-height: 95%; object-fit: contain; object-position: center bottom;">'
+                                f'  </div>'
+                                f'  <div style="position: absolute; bottom: 0; left: 0; width: 100%; background: linear-gradient(180deg, #ffffff 0%, #e6e6e6 100%); padding: 10px 5px; text-align: center; z-index: 4; box-sizing: border-box; border-top: 1px solid #ccc;">'
+                                f'    <div style="color: #1b47ff; font-size: 22px; font-weight: 900; text-transform: uppercase; letter-spacing: -0.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{apelido_atleta}</div>'
+                                f'    <div style="color: #1b47ff; font-size: 11px; font-weight: bold; margin-top: 2px;">{idade_atleta} | {altura_atleta}</div>'
+                                f'    <div style="color: #1b47ff; font-size: 10px; font-weight: 900; margin-top: 5px; font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 4px;">\"{frase_atleta}\"</div>'
+                                f'  </div>'
                                 f'</div>'
                             )
-                            
-                            st.markdown(html_figurinha, unsafe_allow_html=True)
+                            st.markdown(html_canva_premium, unsafe_allow_html=True)
                 st.markdown("<br>", unsafe_allow_html=True)
     else:
         st.info("Nenhum atleta cadastrado para montar o álbum.")
-
 
 # --- ABA 3: MODO CONFRONTO ---
 with aba_confronto:
@@ -380,7 +397,7 @@ with aba_admin:
     senha = st.text_input("Senha Master:", type="password")
     if senha == "volei123":
         st.session_state.admin_logado = True
-        st.success("Acesso administrativo liberado.")
+        st.success("Acesso administrative liberado.")
         
         # ==========================================
         # 1. FORMULÁRIO COMPACTO DE CADASTRO
@@ -456,7 +473,6 @@ with aba_admin:
                         st.success("Cadastro do atleta atualizado com sucesso!")
                         st.rerun()
                         
-            # Remoção do Atleta movida para logo abaixo do form dele para ficar intuitivo
             confirma_atleta = st.checkbox(f"Confirmo a exclusão definitiva de {jogador_editar}.", key=f"del_atleta_check_{id_atleta}")
             if st.button("🗑️ Excluir Atleta do Torneio", type="secondary", key=f"btn_del_atleta_{id_atleta}"):
                 if confirma_atleta and deletar_jogador_banco(id_atleta):
@@ -468,16 +484,14 @@ with aba_admin:
             st.info("Nenhum atleta cadastrado para edição.")
 
         # ==========================================
-        # 3. NOVO: GERENCIAR E REMOVER PARTIDAS DO HISTÓRICO
+        # 3. GERENCIAR E REMOVER PARTIDAS DO HISTÓRICO
         # ==========================================
         st.markdown("---")
         st.subheader("🎬 Gerenciar Partidas Salvas (Histórico)")
         if not df_partidas.empty:
-            # Cria uma lista de seleção com as partidas existentes
             opcoes_partidas = [f"Jogo #{p['id']}: {p['time_a']} vs {p['time_b']}" for _, p in df_partidas.iterrows()]
             partida_selecionada = st.selectbox("Selecione qual partida deseja gerenciar/corrigir:", options=opcoes_partidas)
             
-            # Puxa o ID numérico correto da string selecionada
             id_partida_sel = int(partida_selecionada.split("Jogo #")[1].split(":")[0])
             dados_partida = df_partidas[df_partidas["id"] == id_partida_sel].iloc[0]
 
@@ -497,7 +511,6 @@ with aba_admin:
                         st.success("Placar do histórico corrigido com sucesso!")
                         st.rerun()
             
-            # Botão de Excluir Partida com trava de segurança
             confirma_partida = st.checkbox("Confirmo a exclusão permanente desta partida do histórico.", key=f"check_del_partida_{id_partida_sel}")
             if st.button("🗑️ Excluir Partida Definitivamente", type="secondary", key=f"btn_del_partida_{id_partida_sel}"):
                 if confirma_partida:
