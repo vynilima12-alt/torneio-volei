@@ -194,7 +194,8 @@ with aba_elenco:
     
     if not df_jogadores.empty:
         for time in TODOS_TIMES:
-            atletas_do_time = df_jogadores[df_jogadores["time"] == time]
+            # Filtra os atletas garantindo correspondência exata de string
+            atletas_do_time = df_jogadores[df_jogadores["time"].str.strip() == time.strip()]
             
             if not atletas_do_time.empty:
                 st.markdown(f"### {time}")
@@ -207,19 +208,23 @@ with aba_elenco:
                     if idx < 4:
                         with colunas_fig[idx]:
                             
-                            # Tratamento inteligente para links de upload vindos do Google Drive
+                            # Tratamento inteligente e robusto para links do Google Drive (incluindo open?id=)
                             dados_foto = atleta["foto_jogador"]
                             if pd.isna(dados_foto) or str(dados_foto).strip() == "":
                                 img_src_atleta = FOTO_PADRAO_URL
                             else:
                                 dados_foto_str = str(dados_foto).strip()
                                 if "drive.google.com" in dados_foto_str:
-                                    if "/d/" in dados_foto_str:
-                                        id_arquivo = dados_foto_str.split("/d/")[1].split("/")[0]
-                                    elif "id=" in dados_foto_str:
-                                        id_arquivo = dados_foto_str.split("id=")[1].split("&")[0]
-                                    else:
+                                    id_arquivo = ""
+                                    try:
+                                        if "/d/" in dados_foto_str:
+                                            id_arquivo = dados_foto_str.split("/d/")[1].split("/")[0]
+                                        elif "id=" in dados_foto_str:
+                                            # Captura o ID corretamente mesmo se tiver outros parâmetros com '&'
+                                            id_arquivo = dados_foto_str.split("id=")[1].split("&")[0]
+                                    except Exception:
                                         id_arquivo = ""
+                                    
                                     img_src_atleta = f"https://docs.google.com/uc?export=download&id={id_arquivo}" if id_arquivo else FOTO_PADRAO_URL
                                 elif "base64," in dados_foto_str:
                                     img_src_atleta = dados_foto_str
@@ -230,7 +235,7 @@ with aba_elenco:
                             apelido_atleta = atleta["apelido"] if pd.notna(atleta["apelido"]) and str(atleta["apelido"]).strip() != "" else atleta["nome"].split()[0]
                             posicao_txt = str(atleta["posicao"]).upper() if pd.notna(atleta["posicao"]) else "S"
                             
-                            # Mapeamento exato das posições para as siglas oficiais que você pediu
+                            # Mapeamento exato das posições para as siglas oficiais
                             letra_posicao = "S"
                             if "LEVANTADOR" in posicao_txt: letra_posicao = "LEV"
                             elif "PONTEIRO" in posicao_txt: letra_posicao = "P"
@@ -244,7 +249,7 @@ with aba_elenco:
                             # Exibe a frase real cadastrada no banco de dados
                             frase_atleta = str(atleta["frase"]).upper() if pd.notna(atleta["frase"]) and str(atleta["frase"]).strip() != "" else "COPA DO MUNDO 2026"
                             
-                            # HTML Ajustado: Foto jogada para baixo (alinhada com o rodapé)
+                            # HTML Ajustado: Foto vinda do Drive renderizada por cima do Canva
                             html_canva_premium = (
                                 f'<div style="width: 100%; height: 380px; border-radius: 8px; position: relative; overflow: hidden; font-family: \'Arial\', sans-serif; box-shadow: 0px 8px 16px rgba(0,0,0,0.4); border: 3px solid #ffffff;">'
                                 f'  '
@@ -252,7 +257,7 @@ with aba_elenco:
                                 f'  '
                                 f'  '
                                 f'  <div style="position: absolute; top: 12px; left: 12px; background: linear-gradient(180deg, #ffffff 0%, #cccccc 100%); min-width: 32px; padding: 0 6px; height: 42px; display: flex; align-items: center; justify-content: center; box-shadow: 2px 2px 5px rgba(0,0,0,0.3); z-index: 10; border-radius: 2px;">'
-                                f'    <span style="color: #1b47ff; font-size: 18px; font-weight: 900;">{letra_posicao}</span>'
+                                f'    <span style="color: #1b47ff; font-size: 16px; font-weight: 900;">{letra_posicao}</span>'
                                 f'  </div>'
                                 f'  '
                                 f'  '
@@ -270,9 +275,7 @@ with aba_elenco:
                             )
                             st.markdown(html_canva_premium, unsafe_allow_html=True)
                 st.markdown("<br>", unsafe_allow_html=True)
-    else:
-        st.info("Nenhum atleta cadastrado para montar o álbum.")
-        
+
 # --- ABA 3: MODO CONFRONTO ---
 with aba_confronto:
     st.header("⚔️ Gerenciar Partida em Tempo Real")
