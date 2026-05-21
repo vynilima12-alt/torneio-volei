@@ -9,7 +9,7 @@ from supabase import create_client, Client
 # 1. CONFIGURAÇÕES DA PÁGINA
 # =========================================================
 st.set_page_config(page_title="Copa do Mundo de Vôlei 2026", layout="wide")
-st.title("🏐 Copa do Mundo de Vôlei 2026 — Gestão de Confrontos")
+st.title("Copa do Mundo de Vôlei 2026 — Gestão de Confrontos")
 
 FOTO_PADRAO_URL = "https://cdn-icons-png.flaticon.com/512/4333/4333609.png"
 
