@@ -138,7 +138,14 @@ def converter_imagem_para_base64(arquivo_imagem):
 def obter_imagem_atleta(dados_foto):
     if pd.isna(dados_foto) or str(dados_foto).strip() == "":
         return FOTO_PADRAO_URL
+    
     dados_foto_str = str(dados_foto).strip()
+    
+    # Se já for um link direto da internet (Postimages, por exemplo), retorna ele direto
+    if dados_foto_str.startswith("http"):
+        return dados_foto_str
+        
+    # Fallback caso ainda usem Base64 em uploads manuais pelo Admin
     if "base64," in dados_foto_str:
         dados_foto_str = dados_foto_str.split("base64,")[1]
     try:
@@ -208,24 +215,16 @@ with aba_elenco:
                     if idx < 4:
                         with colunas_fig[idx]:
                             
-                            # Tratamento inteligente e robusto para links do Google Drive (incluindo open?id=)
+                            # Tratamento direto e leve focado em links diretos de imagem (Postimages)
                             dados_foto = atleta["foto_jogador"]
                             if pd.isna(dados_foto) or str(dados_foto).strip() == "":
                                 img_src_atleta = FOTO_PADRAO_URL
                             else:
                                 dados_foto_str = str(dados_foto).strip()
-                                if "drive.google.com" in dados_foto_str:
-                                    id_arquivo = ""
-                                    try:
-                                        if "/d/" in dados_foto_str:
-                                            id_arquivo = dados_foto_str.split("/d/")[1].split("/")[0]
-                                        elif "id=" in dados_foto_str:
-                                            # Captura o ID corretamente mesmo se tiver outros parâmetros com '&'
-                                            id_arquivo = dados_foto_str.split("id=")[1].split("&")[0]
-                                    except Exception:
-                                        id_arquivo = ""
-                                    
-                                    img_src_atleta = f"https://docs.google.com/uc?export=download&id={id_arquivo}" if id_arquivo else FOTO_PADRAO_URL
+                                
+                                # SE FOR LINK DIRETO (Postimages, etc), usa ele purinho sem alterar nada
+                                if dados_foto_str.startswith("http"):
+                                    img_src_atleta = dados_foto_str
                                 elif "base64," in dados_foto_str:
                                     img_src_atleta = dados_foto_str
                                 else:
@@ -249,15 +248,15 @@ with aba_elenco:
                             # Exibe a frase real cadastrada no banco de dados
                             frase_atleta = str(atleta["frase"]).upper() if pd.notna(atleta["frase"]) and str(atleta["frase"]).strip() != "" else "COPA DO MUNDO 2026"
                             
-                            # HTML Ajustado: Foto vinda do Drive renderizada por cima do Canva
+                            # HTML Ajustado: Foto vinda do Postimages renderizada perfeitamente por cima do Canva
                             html_canva_premium = (
                                 f'<div style="width: 100%; height: 380px; border-radius: 8px; position: relative; overflow: hidden; font-family: \'Arial\', sans-serif; box-shadow: 0px 8px 16px rgba(0,0,0,0.4); border: 3px solid #ffffff;">'
                                 f'  '
                                 f'  <img src="{link_fundo_time}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1;">'
                                 f'  '
                                 f'  '
-                                f'  <div style="position: absolute; top: 12px; left: 12px; background: linear-gradient(180deg, #ffffff 0%, #cccccc 100%); min-width: 32px; padding: 0 6px; height: 42px; display: flex; align-items: center; justify-content: center; box-shadow: 2px 2px 5px rgba(0,0,0,0.3); z-index: 10; border-radius: 2px;">'
-                                f'    <span style="color: #1b47ff; font-size: 16px; font-weight: 900;">{letra_posicao}</span>'
+                                f'  <div style="position: absolute; top: 12px; left: 12px; background: linear-gradient(180deg, #ffffff 0%, #cccccc 100%); min-width: 38px; padding: 0 5px; height: 42px; display: flex; align-items: center; justify-content: center; box-shadow: 2px 2px 5px rgba(0,0,0,0.3); z-index: 10; border-radius: 2px;">'
+                                f'    <span style="color: #1b47ff; font-size: 15px; font-weight: 900;">{letra_posicao}</span>'
                                 f'  </div>'
                                 f'  '
                                 f'  '
