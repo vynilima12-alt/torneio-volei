@@ -32,7 +32,6 @@ def carregar_dados_banco():
         response = supabase.table("jogadores").select("*").execute()
         if response.data:
             df = pd.DataFrame(response.data)
-            # Garante a existência das novas colunas na tabela local do Pandas
             for col in ["apelido", "idade", "posicao", "altura", "frase"]:
                 if col not in df.columns:
                     df[col] = None
@@ -165,10 +164,7 @@ with aba_ranking:
             ranking_jogadores["foto_jogador"] = ranking_jogadores["foto_jogador"].apply(
                 lambda x: f"data:image/png;base64,{str(x).split('base64,')[-1]}" if pd.notna(x) and str(x).strip() != "" and not str(x).startswith("http") else (x if pd.notna(x) else FOTO_PADRAO_URL)
             )
-            
-            # Mostra o Apelido no ranking se ele existir, se não mostra o nome
             ranking_jogadores["exibir_nome"] = ranking_jogadores["apelido"].fillna(ranking_jogadores["nome"])
-            
             st.dataframe(
                 ranking_jogadores[["foto_jogador", "exibir_nome", "time", "pontos"]],
                 column_config={
@@ -185,7 +181,6 @@ with aba_elenco:
     st.header("🏃‍♂️ Informações Detalhadas dos Atletas")
     if not df_jogadores.empty:
         selecao_filtro = st.selectbox("Filtrar por Seleção:", options=["Todos"] + TODOS_TIMES)
-        
         df_filtrado = df_jogadores.copy()
         if selecao_filtro != "Todos":
             df_filtrado = df_filtrado[df_filtrado["time"] == selecao_filtro]
@@ -199,7 +194,6 @@ with aba_elenco:
                     nome_completo = atleta["nome"]
                     apelido_atleta = f' "{atleta["apelido"]}"' if pd.notna(atleta["apelido"]) and str(atleta["apelido"]).strip() != "" else ""
                     st.subheader(f"{nome_completo}{apelido_atleta}")
-                    
                     if pd.notna(atleta["frase"]) and str(atleta["frase"]).strip() != "":
                         st.markdown(f"*🗣️ \"{atleta['frase']}\"*")
                     
@@ -215,7 +209,6 @@ with aba_elenco:
 # --- ABA 3: MODO CONFRONTO ---
 with aba_confronto:
     st.header("⚔️ Gerenciar Partida em Tempo Real")
-    
     c_t1, c_t2 = st.columns(2)
     with c_t1:
         time_a_sel = st.selectbox("Selecione o Time A:", options=TODOS_TIMES, index=0)
@@ -230,7 +223,6 @@ with aba_confronto:
         st.warning("Ambas as seleções precisam ter atletas cadastrados para iniciar a partida.")
     else:
         st.markdown("---")
-        
         if "partida_ativa" not in st.session_state:
             st.session_state.pontos_jogo_locais = {row["id"]: 0 for _, row in pd.concat([jugadores_a, jugadores_b]).iterrows()}
             st.session_state.set_atual = 1
@@ -269,7 +261,6 @@ with aba_confronto:
 
         st.markdown("### 🎯 Atribuir Pontos aos Atletas em Quadra:")
         col_quadra_a, col_quadra_b = st.columns(2)
-        
         with col_quadra_a:
             st.markdown(f"**Jogadores de {time_a_sel}**")
             for _, row in jugadores_a.iterrows():
@@ -342,15 +333,11 @@ with aba_confronto:
 # --- ABA 4: HISTÓRICO DE JOGOS ---
 with aba_historico:
     st.header("📜 Histórico de Partidas Realizadas")
-    is_admin = st.session_state.get("admin_logado", False)
-    
     if not df_partidas.empty:
         for _, partida in df_partidas.iterrows():
-            p_id = partida['id']
-            
             st.markdown(
                 f"""
-                <div style="background-color: #ffffff; padding: 20px; border-radius: 12px; margin-bottom: 5px; border-left: 6px solid #ff4b4b; box-shadow: 0px 4px 6px rgba(0,0,0,0.05);">
+                <div style="background-color: #ffffff; padding: 20px; border-radius: 12px; margin-bottom: 15px; border-left: 6px solid #ff4b4b; box-shadow: 0px 4px 6px rgba(0,0,0,0.05);">
                     <h3 style='margin: 0; color: #1e1e1e; font-family: sans-serif; font-size: 20px;'>
                         {partida['time_a']} <span style='color: #ff4b4b;'>{partida['sets_a']}</span> 
                         <span style='color: #cccccc; font-size: 16px;'> x </span> 
@@ -363,29 +350,6 @@ with aba_historico:
                 """, 
                 unsafe_allow_html=True
             )
-            
-            if is_admin:
-                with st.expander(f"🛠️ Modificar Partida #{p_id}"):
-                    c_ed1, c_ed2, c_ed3 = st.columns([1, 1, 2])
-                    with c_ed1:
-                        novos_sets_a = st.number_input(f"Sets {partida['time_a']}:", min_value=0, max_value=3, value=int(partida['sets_a']), key=f"set_a_{p_id}")
-                    with c_ed2:
-                        novos_sets_b = st.number_input(f"Sets {partida['time_b']}:", min_value=0, max_value=3, value=int(partida['sets_b']), key=f"set_b_{p_id}")
-                    with c_ed3:
-                        novas_parciais = st.text_input("Parciais (Ex: 15-12, 13-15):", value=str(partida['placar_sets']), key=f"parciais_{p_id}")
-                    
-                    cb_at, cb_ex = st.columns(2)
-                    with cb_at:
-                        if st.button("💾 Atualizar Placar", key=f"btn_update_partida_{p_id}", type="primary", use_container_width=True):
-                            if atualizar_partida_banco(p_id, novos_sets_a, novos_sets_b, novas_parciais):
-                                st.success("Partida corrigida!")
-                                st.rerun()
-                    with cb_ex:
-                        if st.button("🗑️ Excluir Partida", key=f"btn_delete_partida_{p_id}", type="secondary", use_container_width=True):
-                            if deletar_partida_banco(p_id):
-                                st.success("Partida removida!")
-                                st.rerun()
-            st.markdown("<br>", unsafe_allow_html=True)
     else:
         st.info("Nenhum jogo registrado no histórico.")
 
@@ -397,11 +361,10 @@ with aba_admin:
         st.success("Acesso administrativo liberado.")
         
         # ==========================================
-        # FORMULÁRIO COMPACTO DE CADASTRO (ADAPTADO FORMS)
+        # 1. FORMULÁRIO COMPACTO DE CADASTRO
         # ==========================================
         st.markdown("---")
         st.subheader("➕ Cadastrar Jogador (Manual/Backup)")
-        
         with st.form("form_cadastro_jogador", clear_on_submit=True):
             nome_novo = st.text_input("Nome completo:")
             apelido_novo = st.text_input("Apelido / Nome no Ranking:")
@@ -417,7 +380,6 @@ with aba_admin:
                 
             frase_nova = st.text_area("Frase que te define:")
             arquivo_foto = st.file_uploader("Foto para o perfil:", type=["png", "jpg", "jpeg"])
-            
             botao_cadastrar = st.form_submit_button("Confirmar Cadastro", type="primary")
             
             if botao_cadastrar:
@@ -434,7 +396,7 @@ with aba_admin:
                     st.error("O nome é obrigatório.")
 
         # ==========================================
-        # FORMULÁRIO DE EDIÇÃO DE CADASTROS (ADAPTADO FORMS)
+        # 2. FORMULÁRIO DE EDIÇÃO DE ATLETAS
         # ==========================================
         st.markdown("---")
         st.subheader("🛠️ Editar Cadastro de Atleta")
@@ -464,31 +426,63 @@ with aba_admin:
                     altura_editada = st.number_input("Editar Altura (cm):", min_value=120, max_value=230, value=val_alt, step=1)
 
                 frase_editada = st.text_area("Editar Frase que te define:", value=dados_atleta["frase"] if pd.notna(dados_atleta["frase"]) else "")
-
-                botao_salvar = st.form_submit_button("💾 Salvar Alterações", type="primary")
+                botao_salvar = st.form_submit_button("💾 Salvar Alterações Atleta", type="primary")
                 
                 if botao_salvar:
                     emoji_novo = time_editado.split()[0]
                     if editar_jogador_banco(id_atleta, nome_editado, apelido_editado, time_editado, emoji_novo, idade_editada, posicao_editada, altura_editada, frase_editada):
-                        st.success("Cadastro atualizado com sucesso!")
+                        st.success("Cadastro do atleta atualizado com sucesso!")
                         st.rerun()
+                        
+            # Remoção do Atleta movida para logo abaixo do form dele para ficar intuitivo
+            confirma_atleta = st.checkbox(f"Confirmo a exclusão definitiva de {jogador_editar}.", key=f"del_atleta_check_{id_atleta}")
+            if st.button("🗑️ Excluir Atleta do Torneio", type="secondary", key=f"btn_del_atleta_{id_atleta}"):
+                if confirma_atleta and deletar_jogador_banco(id_atleta):
+                    st.success("Jogador removido com sucesso.")
+                    st.rerun()
+                elif not confirma_atleta:
+                    st.error("Marque a caixa de confirmação para deletar o atleta.")
         else:
             st.info("Nenhum atleta cadastrado para edição.")
 
         # ==========================================
-        # BLOCO DE EXCLUSÃO
+        # 3. NOVO: GERENCIAR E REMOVER PARTIDAS DO HISTÓRICO
         # ==========================================
         st.markdown("---")
-        st.subheader("🗑️ Remover Atleta do Torneio")
-        if not df_jogadores.empty:
-            jogador_del = st.selectbox("Selecione quem deseja remover:", options=df_jogadores["nome"].tolist(), key="sb_del_adm")
-            id_del = df_jogadores[df_jogadores["nome"] == jogador_del].iloc[0]["id"]
-            confirma = st.checkbox("Confirmo a exclusão permanente deste jogador.", key=f"check_del_{id_del}")
+        st.subheader("🎬 Gerenciar Partidas Salvas (Histórico)")
+        if not df_partidas.empty:
+            # Cria uma lista de seleção com as partidas existentes
+            opcoes_partidas = [f"Jogo #{p['id']}: {p['time_a']} vs {p['time_b']}" for _, p in df_partidas.iterrows()]
+            partida_selecionada = st.selectbox("Selecione qual partida deseja gerenciar/corrigir:", options=opcoes_partidas)
             
-            if st.button("Deletar Jogador", type="secondary", key=f"btn_del_{id_del}"):
-                if confirma:
-                    if deletar_jogador_banco(id_del):
-                        st.success("Jogador removido do banco.")
+            # Puxa o ID numérico correto da string selecionada
+            id_partida_sel = int(partida_selecionada.split("Jogo #")[1].split(":")[0])
+            dados_partida = df_partidas[df_partidas["id"] == id_partida_sel].iloc[0]
+
+            with st.form(f"form_edicao_partida_{id_partida_sel}"):
+                st.write(f"Modificando resultado de: **{dados_partida['time_a']} vs {dados_partida['time_b']}**")
+                c_p1, c_p2, c_p3 = st.columns([1, 1, 2])
+                with c_p1:
+                    n_sets_a = st.number_input(f"Sets {dados_partida['time_a']}:", min_value=0, max_value=3, value=int(dados_partida['sets_a']))
+                with c_p2:
+                    n_sets_b = st.number_input(f"Sets {dados_partida['time_b']}:", min_value=0, max_value=3, value=int(dados_partida['sets_b']))
+                with c_p3:
+                    n_parciais = st.text_input("Parciais dos Sets (Ex: 15-12, 13-15):", value=str(dados_partida['placar_sets']))
+
+                botao_salvar_partida = st.form_submit_button("💾 Salvar Alterações na Partida", type="primary")
+                if botao_salvar_partida:
+                    if atualizar_partida_banco(id_partida_sel, n_sets_a, n_sets_b, n_parciais):
+                        st.success("Placar do histórico corrigido com sucesso!")
+                        st.rerun()
+            
+            # Botão de Excluir Partida com trava de segurança
+            confirma_partida = st.checkbox("Confirmo a exclusão permanente desta partida do histórico.", key=f"check_del_partida_{id_partida_sel}")
+            if st.button("🗑️ Excluir Partida Definitivamente", type="secondary", key=f"btn_del_partida_{id_partida_sel}"):
+                if confirma_partida:
+                    if deletar_partida_banco(id_partida_sel):
+                        st.success("Partida deletada e histórico atualizado!")
                         st.rerun()
                 else:
-                    st.error("Marque a caixa de confirmação para poder deletar.")
+                    st.error("Marque a caixa de confirmação para deletar a partida.")
+        else:
+            st.info("Nenhuma partida registrada para edição.")
