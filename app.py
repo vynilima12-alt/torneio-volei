@@ -20,16 +20,16 @@ TODOS_TIMES = GRUPO_A + GRUPO_B
 
 LISTA_POSICOES = ["Ponteiro(a)", "Central", "Levantador(a)", "Oposto(a)", "Líbero"]
 
-# Links oficiais e diretos do seu Canva (Postimages)
+# Links diretos dos PNGs limpos do Canva hospedados no Imgur
 LINKS_FUNDOS_LIMPOS = {
-    "🇧🇷 Brasil": "https://i.postimg.cc/t4vHWsFP/Brasil.png",
-    "🇺🇸 EUA": "https://i.postimg.cc/52KMLX8L/EUA.png",
-    "🇫🇷 França": "https://i.postimg.cc/7Zty05S3/Franca.png",
-    "🇯🇵 Japão": "https://i.postimg.cc/cLkNwvfB/Japao.png",
-    "🇩🇪 Alemanha": "https://i.postimg.cc/sggrMYGZ/Alemanha.png",
-    "🇦🇷 Argentina": "https://i.postimg.cc/pLctzmKF/Argentina.png",
-    "🇪🇸 Espanha": "https://i.postimg.cc/HkvCXrbM/Espanha.png",
-    "🇵🇹 Portugal": "https://i.postimg.cc/DwpKLS15/Portugal.png",
+    "🇧🇷 Brasil": "https://i.imgur.com/twomOPg.png",
+    "🇺🇸 EUA": "https://i.imgur.com/dq2MoW7.png",
+    "🇫🇷 França": "https://i.imgur.com/BTszNIS.png",
+    "🇯🇵 Japão": "https://i.imgur.com/XWFPcH0.png",
+    "🇩🇪 Alemanha": "https://i.imgur.com/Go6KygO.png",
+    "🇦🇷 Argentina": "https://i.imgur.com/VUf5oCx.png",
+    "🇪🇸 Espanha": "https://i.imgur.com/nYwbcCS.png",
+    "🇵🇹 Portugal": "https://i.imgur.com/96OtRQS.png",
 }
 
 SUPABASE_URL = st.secrets["connections"]["supabase"]["url"]
@@ -230,27 +230,37 @@ with aba_elenco:
                             apelido_atleta = atleta["apelido"] if pd.notna(atleta["apelido"]) and str(atleta["apelido"]).strip() != "" else atleta["nome"].split()[0]
                             posicao_txt = str(atleta["posicao"]).upper() if pd.notna(atleta["posicao"]) else "S"
                             
+                            # Mapeamento exato das posições para as siglas oficiais que você pediu
                             letra_posicao = "S"
-                            if "LEVANTADOR" in posicao_txt: letra_posicao = "L"
+                            if "LEVANTADOR" in posicao_txt: letra_posicao = "LEV"
                             elif "PONTEIRO" in posicao_txt: letra_posicao = "P"
                             elif "LÍBERO" in posicao_txt or "LIBERO" in posicao_txt: letra_posicao = "L"
                             elif "CENTRAL" in posicao_txt: letra_posicao = "C"
-                            elif "OPOSTO" in posicao_txt: letra_posicao = "O"
+                            elif "OPOSTO" in posicao_txt: letra_posicao = "OPP"
 
                             altura_atleta = f"{int(atleta['altura'])} CM" if pd.notna(atleta['altura']) else "—"
                             idade_atleta = f"{int(atleta['idade'])}" if pd.notna(atleta['idade']) else "—"
-                            frase_atleta = str(atleta["frase"]).upper() if pd.notna(atleta["frase"]) and str(atleta["frase"]).strip() != "" else "WE'RE GONNA TAKE THE POWER BACK"
                             
-                            # HTML Compactado em Camadas Absolutas com a bandeira correta de fundo
+                            # Exibe a frase real cadastrada no banco de dados
+                            frase_atleta = str(atleta["frase"]).upper() if pd.notna(atleta["frase"]) and str(atleta["frase"]).strip() != "" else "COPA DO MUNDO 2026"
+                            
+                            # HTML Ajustado: Foto jogada para baixo (alinhada com o rodapé)
                             html_canva_premium = (
                                 f'<div style="width: 100%; height: 380px; border-radius: 8px; position: relative; overflow: hidden; font-family: \'Arial\', sans-serif; box-shadow: 0px 8px 16px rgba(0,0,0,0.4); border: 3px solid #ffffff;">'
+                                f'  '
                                 f'  <img src="{link_fundo_time}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1;">'
-                                f'  <div style="position: absolute; top: 12px; left: 12px; background: linear-gradient(180deg, #ffffff 0%, #cccccc 100%); width: 32px; height: 42px; display: flex; align-items: center; justify-content: center; box-shadow: 2px 2px 5px rgba(0,0,0,0.3); z-index: 10; border-radius: 2px;">'
-                                f'    <span style="color: #1b47ff; font-size: 22px; font-weight: 900;">{letra_posicao}</span>'
+                                f'  '
+                                f'  '
+                                f'  <div style="position: absolute; top: 12px; left: 12px; background: linear-gradient(180deg, #ffffff 0%, #cccccc 100%); min-width: 32px; padding: 0 6px; height: 42px; display: flex; align-items: center; justify-content: center; box-shadow: 2px 2px 5px rgba(0,0,0,0.3); z-index: 10; border-radius: 2px;">'
+                                f'    <span style="color: #1b47ff; font-size: 18px; font-weight: 900;">{letra_posicao}</span>'
                                 f'  </div>'
-                                f'  <div style="position: absolute; top: 10px; left: 0; width: 100%; height: 65%; display: flex; align-items: center; justify-content: center; z-index: 5;">'
-                                f'    <img src="{img_src_atleta}" style="width: 85%; height: 100%; object-fit: cover; border-radius: 4px;">'
+                                f'  '
+                                f'  '
+                                f'  <div style="position: absolute; bottom: 85px; left: 0; width: 100%; height: 55%; display: flex; align-items: flex-end; justify-content: center; z-index: 5;">'
+                                f'    <img src="{img_src_atleta}" style="width: auto; max-width: 90%; height: 100%; object-fit: contain;">'
                                 f'  </div>'
+                                f'  '
+                                f'  '
                                 f'  <div style="position: absolute; bottom: 0; left: 0; width: 100%; background: linear-gradient(180deg, #ffffff 0%, #f2f2f2 100%); padding: 12px 5px; text-align: center; box-sizing: border-box; border-top: 2px solid #ffffff; z-index: 12;">'
                                 f'    <div style="color: #1b47ff; font-size: 20px; font-weight: 900; text-transform: uppercase; letter-spacing: -0.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.1;">{apelido_atleta}</div>'
                                 f'    <div style="color: #1b47ff; font-size: 11px; font-weight: bold; margin-top: 3px; letter-spacing: 0.5px;">{idade_atleta} | {altura_atleta}</div>'
@@ -262,7 +272,7 @@ with aba_elenco:
                 st.markdown("<br>", unsafe_allow_html=True)
     else:
         st.info("Nenhum atleta cadastrado para montar o álbum.")
-
+        
 # --- ABA 3: MODO CONFRONTO ---
 with aba_confronto:
     st.header("⚔️ Gerenciar Partida em Tempo Real")
@@ -415,7 +425,7 @@ with aba_admin:
     senha = st.text_input("Senha Master:", type="password")
     if senha == "volei123":
         st.session_state.admin_logado = True
-        st.success("Acesso administrativo liberado.")
+        st.success("Acesso administrative liberado.")
         
         # ==========================================
         # 1. FORMULÁRIO COMPACTO DE CADASTRO
@@ -488,7 +498,7 @@ with aba_admin:
                 if botao_salvar:
                     emoji_novo = time_editado.split()[0]
                     if editar_jogador_banco(id_atleta, nome_editado, apelido_editado, time_editado, emoji_novo, idade_editada, posicao_editada, altura_editada, frase_editada):
-                        st.success("Cadastro do atleta updated!")
+                        st.success("Cadastro do atleta atualizado com sucesso!")
                         st.rerun()
                         
             confirma_atleta = st.checkbox(f"Confirmo a exclusão definitiva de {jogador_editar}.", key=f"del_atleta_check_{id_atleta}")
