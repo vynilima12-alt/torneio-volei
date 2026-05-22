@@ -453,11 +453,14 @@ with aba_confronto:
                             del st.session_state.partida_ativa
                         st.rerun()                                          
 
-# --- ABA 4: HISTÓRICO DE JOGOS ---
+# --- ABA 4: HISTÓRICO DE JOGOS (EXIBINDO PONTUADORES) ---
 with aba_historico:
     st.header("📜 Histórico de Partidas Realizadas")
     if not df_partidas.empty:
         for _, partida in df_partidas.iterrows():
+            # Confere se a coluna nova existe na linha para não bugar jogos antigos
+            detalhes = partida['detalhes_pontos'] if 'detalhes_pontos' in partida and pd.notna(partida['detalhes_pontos']) else "Sem dados de pontuadores individuais."
+            
             st.markdown(
                 f"""
                 <div style="background-color: #ffffff; padding: 20px; border-radius: 12px; margin-bottom: 15px; border-left: 6px solid #ff4b4b; box-shadow: 0px 4px 6px rgba(0,0,0,0.05);">
@@ -466,8 +469,11 @@ with aba_historico:
                         <span style='color: #cccccc; font-size: 16px;'> x </span> 
                         <span style='color: #ff4b4b;'>{partida['sets_b']}</span> {partida['time_b']}
                     </h3>
-                    <p style='color: #666666; font-size: 15px; margin: 8px 0 0 0; font-family: sans-serif;'>
+                    <p style='color: #666666; font-size: 14px; margin: 8px 0 0 0; font-family: sans-serif;'>
                         📊 <b>Parciais:</b> {partida['placar_sets'] if partida['placar_sets'] else 'Sem parciais gravadas'}
+                    </p>
+                    <p style='color: #1b47ff; font-size: 13px; margin: 5px 0 0 0; font-family: sans-serif; font-weight: bold;'>
+                        🎯 <b>Pontuadores:</b> <span style='color: #444444; font-weight: normal;'>{detalhes}</span>
                     </p>
                 </div>
                 """, 
