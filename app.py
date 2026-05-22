@@ -182,6 +182,10 @@ df_partidas = carregar_partidas_banco()
 # =========================================================
 # 3. INTERFACE INTERATIVA (ABAS)
 # =========================================================
+# Inicializa o estado de login do admin se não existir
+if "admin_logado" not in st.session_state:
+    st.session_state.admin_logado = False
+
 aba_ranking, aba_elenco, aba_confronto, aba_historico, aba_admin = st.tabs([
     "📊 Classificação & Estatísticas", 
     "🏃‍♂️ Elenco & Fichas",
