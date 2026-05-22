@@ -20,16 +20,16 @@ TODOS_TIMES = GRUPO_A + GRUPO_B
 
 LISTA_POSICOES = ["Ponteiro(a)", "Central", "Levantador(a)", "Oposto(a)", "Líbero"]
 
-# Links diretos dos PNGs limpos do Canva hospedados no Imgur
+# LINKS DEFINITIVOS E SEGUROS DO POSTIMAGES (Fundo limpo do seu Canva)
 LINKS_FUNDOS_LIMPOS = {
-    "🇧🇷 Brasil": "https://i.imgur.com/twomOPg.png",
-    "🇺🇸 EUA": "https://i.imgur.com/dq2MoW7.png",
-    "🇫🇷 França": "https://i.imgur.com/BTszNIS.png",
-    "🇯🇵 Japão": "https://i.imgur.com/XWFPcH0.png",
-    "🇩🇪 Alemanha": "https://i.imgur.com/Go6KygO.png",
-    "🇦🇷 Argentina": "https://i.imgur.com/VUf5oCx.png",
-    "🇪🇸 Espanha": "https://i.imgur.com/nYwbcCS.png",
-    "🇵🇹 Portugal": "https://i.imgur.com/96OtRQS.png",
+    "🇧🇷 Brasil": "https://i.postimg.cc/t4vHWsFP/Brasil.png",
+    "🇺🇸 EUA": "https://i.postimg.cc/52KMLX8L/EUA.png",
+    "🇫🇷 França": "https://i.postimg.cc/7Zty05S3/Franca.png",
+    "🇯🇵 Japão": "https://i.postimg.cc/cLkNwvfB/Japao.png",
+    "🇩🇪 Alemanha": "https://i.postimg.cc/sggrMYGZ/Alemanha.png",
+    "🇦🇷 Argentina": "https://i.postimg.cc/pLctzmKF/Argentina.png",
+    "🇪🇸 Espanha": "https://i.postimg.cc/HkvCXrbM/Espanha.png",
+    "🇵🇹 Portugal": "https://i.postimg.cc/DwpKLS15/Portugal.png",
 }
 
 SUPABASE_URL = st.secrets["connections"]["supabase"]["url"]
@@ -73,7 +73,6 @@ def atualizar_partida_banco(partida_id, sets_a, sets_b, placar_sets):
 
 def zerar_rankings_banco():
     try:
-        # Atualiza o campo pontos de TODOS os jogadores para 0
         supabase.table("jogadores").update({"pontos": 0}).neq("id", 0).execute()
         return True
     except Exception:
@@ -84,15 +83,13 @@ def deletar_partida_banco(partida_id):
         supabase.table("partidas").delete().eq("id", partida_id).execute()
         return True
     except Exception:
-        return False
+        return False
 
 def salvar_partida_e_estatisticas(time_a, time_b, sets_a, sets_b, string_sets, pontos_partida_dict):
     try:
-        # Cria uma string legível com os pontuadores do jogo para salvar no histórico
         texto_pontuadores = []
         for j_id, pts in pontos_partida_dict.items():
             if pts > 0:
-                # Busca o apelido do jogador para registrar no texto
                 res_j = supabase.table("jogadores").select("apelido, nome").eq("id", j_id).execute()
                 if res_j.data:
                     nome_exibir = res_j.data[0]["apelido"] if res_j.data[0]["apelido"] else res_j.data[0]["nome"]
@@ -104,26 +101,28 @@ def salvar_partida_e_estatisticas(time_a, time_b, sets_a, sets_b, string_sets, p
             "time_a": time_a, "time_b": time_b,
             "sets_a": sets_a, "sets_b": sets_b, 
             "placar_sets": string_sets,
-            "detalhes_pontos": string_detalhe_pontos  # Salvando na coluna nova
+            "detalhes_pontos": string_detalhe_pontos
         }
         supabase.table("partidas").insert(dados_partida).execute()
         
-        # Atualiza a pontuação acumulada dos jogadores para o ranking
         for jogador_id, pontos_ganhos in pontos_partida_dict.items():
             if pontos_ganhos > 0:
-                res = supabase.table("jogadores").select("pontos").eq("id", ...str(jogador_id)).execute()
+                res = supabase.table("jogadores").select("pontos").eq("id", int(jogador_id)).execute()
                 if res.data:
                     pontos_atuais = res.data[0]["pontos"]
                     novo_total = pontos_atuais + pontos_ganhos
-                    supabase.table("jogadores").update({"pontos": novo_total}).eq("id", jogador_id).execute()
+                    supabase.table("jogadores").update({"pontos": novo_total}).eq("id", int(jogador_id)).execute()
         return True
     except Exception:
         return False       
 
 def inserir_jogador_banco(nome, apelido, time, emoji, foto_base64, idade, posicao, altura, frase):
     try:
+        foto_final = foto_base64
+        if foto_base64 and not foto_base64.startswith("http") and not foto_base64.startswith("data:"):
+            foto_final = f"data:image/png;base64,{foto_base64}"
         dados = {
-            "nome": nome, "apelido": apelido, "time": time, "foto_time": emoji, "foto_jogador": foto_base64, 
+            "nome": nome, "apelido": apelido, "time": time, "foto_time": emoji, "foto_jogador": foto_final, 
             "pontos": 0, "idade": idade, "posicao": posicao, "altura": altura, "frase": frase
         }
         supabase.table("jogadores").insert(dados).execute()
@@ -161,14 +160,9 @@ def converter_imagem_para_base64(arquivo_imagem):
 def obter_imagem_atleta(dados_foto):
     if pd.isna(dados_foto) or str(dados_foto).strip() == "":
         return FOTO_PADRAO_URL
-    
     dados_foto_str = str(dados_foto).strip()
-    
-    # Se já for um link direto da internet (Postimages, por exemplo), retorna ele direto
     if dados_foto_str.startswith("http"):
         return dados_foto_str
-        
-    # Fallback caso ainda usem Base64 em uploads manuais pelo Admin
     if "base64," in dados_foto_str:
         dados_foto_str = dados_foto_str.split("base64,")[1]
     try:
@@ -182,7 +176,6 @@ df_partidas = carregar_partidas_banco()
 # =========================================================
 # 3. INTERFACE INTERATIVA (ABAS)
 # =========================================================
-# Inicializa o estado de login do admin se não existir
 if "admin_logado" not in st.session_state:
     st.session_state.admin_logado = False
 
@@ -226,7 +219,6 @@ with aba_ranking:
 with aba_elenco:
     st.header("📖 Álbum de Figurinhas Premium — Copa 2026")
     
-    # Injeta um estilo CSS rápido para sumir com as barras de rolagem feias do navegador, mantendo o deslize nativo
     st.markdown(
         """
         <style>
@@ -257,23 +249,16 @@ with aba_elenco:
             
             if not atletas_do_time.empty:
                 st.markdown(f"### {time}")
-                
-                # Criamos a abertura da nossa linha/carrossel em HTML
                 html_carrossel = '<div class="carrossel-container">'
                 
                 for idx, (_, atleta) in enumerate(atletas_do_time.reset_index().iterrows()):
-                    # Link da bandeira estilizada do país
                     link_fundo_time = LINKS_FUNDOS_LIMPOS.get(time, FOTO_PADRAO_URL)
-                    
-                    # Link da foto do jogador (Postimages direto)
                     dados_foto = atleta["foto_jogador"]
                     img_src_atleta = str(dados_foto).strip() if pd.notna(dados_foto) and str(dados_foto).strip() != "" else FOTO_PADRAO_URL
 
-                    # Variáveis do atleta
                     apelido_atleta = atleta["apelido"] if pd.notna(atleta["apelido"]) and str(atleta["apelido"]).strip() != "" else atleta["nome"].split()[0]
                     posicao_txt = str(atleta["posicao"]).upper() if pd.notna(atleta["posicao"]) else "S"
                     
-                    # Mapeamento exato das posições para as siglas oficiais
                     letra_posicao = "S"
                     if "LEVANTADOR" in posicao_txt: letra_posicao = "LEV"
                     elif "PONTEIRO" in posicao_txt: letra_posicao = "P"
@@ -285,7 +270,6 @@ with aba_elenco:
                     idade_atleta = f"{int(atleta['idade'])}" if pd.notna(atleta['idade']) else "—"
                     frase_atleta = str(atleta["frase"]).upper() if pd.notna(atleta["frase"]) and str(atleta["frase"]).strip() != "" else "COPA DO MUNDO 2026"
                     
-                    # Monta cada figurinha (Proporção perfeita 2:3 -> 200px x 300px)
                     html_carrossel += (
                         f'<div style="'
                         f'  flex: 0 0 auto; '
@@ -297,20 +281,13 @@ with aba_elenco:
                         f'  font-family: \'Arial\', sans-serif; '
                         f'  box-shadow: 0px 6px 12px rgba(0,0,0,0.5);'
                         f'">'
-                        f'  '
                         f'  <img src="{link_fundo_time}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1;">'
-                        f'  '
-                        f'  '
                         f'  <div style="position: absolute; top: 8px; left: 8px; background: linear-gradient(180deg, #ffffff 0%, #cccccc 100%); min-width: 28px; padding: 0 4px; height: 32px; display: flex; align-items: center; justify-content: center; box-shadow: 1px 1px 4px rgba(0,0,0,0.4); z-index: 10; border-radius: 2px;">'
                         f'    <span style="color: #1b47ff; font-size: 13px; font-weight: 900;">{letra_posicao}</span>'
                         f'  </div>'
-                        f'  '
-                        f'  '
                         f'  <div style="position: absolute; bottom: 0; left: 0; width: 100%; height: 75%; display: flex; align-items: flex-end; justify-content: center; z-index: 5; padding-bottom: 60px; box-sizing: border-box;">'
                         f'    <img src="{img_src_atleta}" style="width: auto; max-width: 95%; height: 100%; object-fit: contain;">'
                         f'  </div>'
-                        f'  '
-                        f'  '
                         f'  <div style="position: absolute; bottom: 0; left: 0; width: 100%; background: linear-gradient(0deg, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.7) 75%, rgba(0,0,0,0) 100%); padding: 15px 5px 8px 5px; text-align: center; box-sizing: border-box; z-index: 12;">'
                         f'    <div style="color: #ffffff; font-size: 15px; font-weight: 900; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.1; text-shadow: 1px 1px 2px #000;">{apelido_atleta}</div>'
                         f'    <div style="color: #bbbbbb; font-size: 10px; font-weight: bold; margin-top: 2px; text-shadow: 1px 1px 1px #000;">{idade_atleta} ANOS | {altura_atleta}</div>'
@@ -318,22 +295,16 @@ with aba_elenco:
                         f'  </div>'
                         f'</div>'
                     )
-                
-                # Fecha a div do carrossel deste país
                 html_carrossel += '</div>'
-                
-                # Renderiza o carrossel completo no Streamlit
                 st.markdown(html_carrossel, unsafe_allow_html=True)
                 st.markdown("<br>", unsafe_allow_html=True)
     else:
         st.info("Nenhum atleta cadastrado para montar o álbum.")
 
-
 # --- ABA 3: MODO CONFRONTO (BLINDADO POR SENHA) ---
 with aba_confronto:
     st.header("⚔️ Gerenciar Partida em Tempo Real")
     
-    # CHECAGEM DE SEGURANÇA: Só gerencia se o Admin estiver logado na aba 5
     if not st.session_state.admin_logado:
         st.warning("🔒 Apenas administradores autorizados podem iniciar partidas ou computar pontos.")
         st.info("Por favor, vá até a aba '🔒 Painel Admin' e insira a senha master para liberar este recurso.")
@@ -487,7 +458,6 @@ with aba_admin:
         st.session_state.admin_logado = True
         st.success("Acesso administrativo liberado. O 'Modo Confronto' agora está desbloqueado!")
 
-        # NOVO PAINEL DE CONTROLE DE CAMPEONATO
         st.markdown("---")
         st.subheader("🚨 ZERAR E RESETAR TORNEIO")
         st.warning("Atenção: O botão abaixo vai zerar a pontuação de TODOS os atletas no banco de dados. Use apenas se for começar uma nova temporada!")
@@ -574,7 +544,7 @@ with aba_admin:
                 if botao_salvar:
                     emoji_novo = time_editado.split()[0]
                     if editar_jogador_banco(id_atleta, nome_editado, apelido_editado, time_editado, emoji_novo, idade_editada, posicao_editada, altura_editada, frase_editada):
-                        st.success("Cadastro do atleta atualizado com sucesso!")
+                        st.success("Cadastro do atleta updated!")
                         st.rerun()
                         
             confirma_atleta = st.checkbox(f"Confirmo a exclusão definitiva de {jogador_editar}.", key=f"del_atleta_check_{id_atleta}")
@@ -583,7 +553,7 @@ with aba_admin:
                     st.success("Jogador removido com sucesso.")
                     st.rerun()
                 elif not confirma_atleta:
-                    st.error("Marque a caixa de confirmação para deletar a atleta.")
+                    st.error("Marque a caixa de confirmação para deletar o atleta.")
         else:
             st.info("Nenhum atleta cadastrado para edição.")
 
@@ -619,7 +589,7 @@ with aba_admin:
             if st.button("🗑️ Excluir Partida Definitivamente", type="secondary", key=f"btn_del_partida_{id_partida_sel}"):
                 if confirma_partida:
                     if deletar_partida_banco(id_partida_sel):
-                        st.success("Partida deletada e histórico updated!")
+                        st.success("Partida deletada e histórico atualizado!")
                         st.rerun()
                 else:
                     st.error("Marque a caixa de confirmação para deletar a partida.")
