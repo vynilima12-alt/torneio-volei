@@ -485,11 +485,27 @@ with aba_historico:
 # --- ABA 5: ADMINISTRAÇÃO ---
 with aba_admin:
     senha = st.text_input("Senha Master:", type="password")
-    if senha == "volei123":
+    if senha == "mikasa123":
         st.session_state.admin_logado = True
-        st.success("Acesso administrative liberado.")
+        st.success("Acesso administrativo liberado. O 'Modo Confronto' agora está desbloqueado!")
+
+# NOVO PAINEL DE CONTROLE DE CAMPEONATO
+        st.markdown("---")
+        st.subheader("🚨 ZERAR E RESETAR TORNEIO")
+        st.warning("Atenção: O botão abaixo vai zerar a pontuação de TODOS os atletas no banco de dados. Use apenas se for começar uma nova temporada!")
         
-        # ==========================================
+        confirmou_reset = st.checkbox("Estou ciente de que isso vai zerar os pontos do ranking individual e por equipes.")
+        if st.button("🔄 Zerar Todos os Rankings", type="secondary"):
+            if confirmou_reset:
+                if zerar_rankings_banco():
+                    st.success("Rankings zerados com sucesso! Todo mundo começou com 0 pontos.")
+                    st.rerun()
+                else:
+                    st.error("Erro técnico ao tentar limpar os dados do Supabase.")
+            else:
+                st.error("Por favor, marque a caixa de confirmação antes de resetar.")        
+        
+       ==========================================
         # 1. FORMULÁRIO COMPACTO DE CADASTRO
         # ==========================================
         st.markdown("---")
