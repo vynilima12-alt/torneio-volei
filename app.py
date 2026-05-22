@@ -71,31 +71,54 @@ def atualizar_partida_banco(partida_id, sets_a, sets_b, placar_sets):
     except Exception:
         return False
 
+def zerar_rankings_banco():
+    try:
+        # Atualiza o campo pontos de TODOS os jogadores para 0
+        supabase.table("jogadores").update({"pontos": 0}).neq("id", 0).execute()
+        return True
+    except Exception:
+        return False
+
 def deletar_partida_banco(partida_id):
     try:
         supabase.table("partidas").delete().eq("id", partida_id).execute()
         return True
     except Exception:
-        return False
+        return False
 
 def salvar_partida_e_estatisticas(time_a, time_b, sets_a, sets_b, string_sets, pontos_partida_dict):
     try:
+        # Cria uma string legível com os pontuadores do jogo para salvar no histórico
+        texto_pontuadores = []
+        for j_id, pts in pontos_partida_dict.items():
+            if pts > 0:
+                # Busca o apelido do jogador para registrar no texto
+                res_j = supabase.table("jogadores").select("apelido, nome").eq("id", j_id).execute()
+                if res_j.data:
+                    nome_exibir = res_j.data[0]["apelido"] if res_j.data[0]["apelido"] else res_j.data[0]["nome"]
+                    texto_pontuadores.append(f"{nome_exibir} ({pts})")
+        
+        string_detalhe_pontos = ", ".join(texto_pontuadores) if texto_pontuadores else "Nenhum ponto individual registrado"
+
         dados_partida = {
             "time_a": time_a, "time_b": time_b,
-            "sets_a": sets_a, "sets_b": sets_b, "placar_sets": string_sets
+            "sets_a": sets_a, "sets_b": sets_b, 
+            "placar_sets": string_sets,
+            "detalhes_pontos": string_detalhe_pontos  # Salvando na coluna nova
         }
         supabase.table("partidas").insert(dados_partida).execute()
         
+        # Atualiza a pontuação acumulada dos jogadores para o ranking
         for jogador_id, pontos_ganhos in pontos_partida_dict.items():
             if pontos_ganhos > 0:
-                res = supabase.table("jogadores").select("pontos").eq("id", jogador_id).execute()
+                res = supabase.table("jogadores").select("pontos").eq("id", ...str(jogador_id)).execute()
                 if res.data:
                     pontos_atuais = res.data[0]["pontos"]
                     novo_total = pontos_atuais + pontos_ganhos
                     supabase.table("jogadores").update({"pontos": novo_total}).eq("id", jogador_id).execute()
         return True
     except Exception:
-        return False
+        return False       
 
 def inserir_jogador_banco(nome, apelido, time, emoji, foto_base64, idade, posicao, altura, frase):
     try:
