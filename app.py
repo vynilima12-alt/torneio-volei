@@ -329,129 +329,129 @@ with aba_elenco:
         st.info("Nenhum atleta cadastrado para montar o álbum.")
 
 
-# --- ABA 3: MODO CONFRONTO ---
+# --- ABA 3: MODO CONFRONTO (BLINDADO POR SENHA) ---
 with aba_confronto:
     st.header("⚔️ Gerenciar Partida em Tempo Real")
-    c_t1, c_t2 = st.columns(2)
-    with c_t1:
-        time_a_sel = st.selectbox("Selecione o Time A:", options=TODOS_TIMES, index=0)
-    with c_t2:
-        opcoes_time_b = [t for t in TODOS_TIMES if t != time_a_sel]
-        time_b_sel = st.selectbox("Selecione o Time B:", options=opcoes_time_b, index=0)
-
-    jugadores_a = df_jogadores[df_jogadores["time"] == time_a_sel]
-    jugadores_b = df_jogadores[df_jogadores["time"] == time_b_sel]
-
-    if jugadores_a.empty or jugadores_b.empty:
-        st.warning("Ambas as seleções precisam ter atletas cadastrados para iniciar a partida.")
+    
+    # CHECAGEM DE SEGURANÇA: Só gerencia se o Admin estiver logado na aba 5
+    if not st.session_state.admin_logado:
+        st.warning("🔒 Apenas administradores autorizados podem iniciar partidas ou computar pontos.")
+        st.info("Por favor, vá até a aba '🔒 Painel Admin' e insira a senha master para liberar este recurso.")
     else:
-        st.markdown("---")
-        if "partida_ativa" not in st.session_state:
-            st.session_state.pontos_jogo_locais = {row["id"]: 0 for _, row in pd.concat([jugadores_a, jugadores_b]).iterrows()}
-            st.session_state.set_atual = 1
-            st.session_state.historico_parciais = []
-            st.session_state.sets_ganhos_a = 0
-            st.session_state.sets_ganhos_b = 0
-            st.session_state.placar_set_a = 0
-            st.session_state.placar_set_b = 0
-            st.session_state.partida_ativa = True
+        # Todo o seu código antigo do Modo Confronto roda aqui dentro do 'else'
+        c_t1, c_t2 = st.columns(2)
+        with c_t1:
+            time_a_sel = st.selectbox("Selecione o Time A:", options=TODOS_TIMES, index=0)
+        with c_t2:
+            opcoes_time_b = [t for t in TODOS_TIMES if t != time_a_sel]
+            time_b_sel = st.selectbox("Selecione o Time B:", options=opcoes_time_b, index=0)
 
-        st.markdown(
-            f"""
-            <div style="background-color: #1a1a1a; padding: 25px; border-radius: 15px; border: 3px solid #ff4b4b; text-align: center; margin-bottom: 25px; box-shadow: 0px 8px 16px rgba(0,0,0,0.3);">
-                <div style="color: #ff4b4b; font-weight: bold; letter-spacing: 2px; font-size: 14px; margin-bottom: 10px; font-family: monospace;">SET {st.session_state.set_atual} EM ANDAMENTO</div>
-                <div style="display: block; margin: 0 auto; text-align: center;">
-                    <table style="width: 100%; border-collapse: collapse;">
-                        <tr>
-                            <td style="width: 40%; text-align: right; color: white; font-size: 22px; font-weight: bold; padding-right: 15px;">{time_a_sel}</td>
-                            <td style="width: 20%; text-align: center; color: #ff4b4b; font-size: 45px; font-weight: bold; font-family: monospace; background: #000; border-radius: 8px; padding: 5px 10px;">
-                                {st.session_state.placar_set_a} <span style="color: #444; font-size: 25px;">:</span> {st.session_state.placar_set_b}
-                            </td>
-                            <td style="width: 40%; text-align: left; color: white; font-size: 22px; font-weight: bold; padding-left: 15px;">{time_b_sel}</td>
-                        </tr>
-                        <tr>
-                            <td style="text-align: right; color: #00ff00; font-size: 16px; font-weight: bold; padding-right: 15px;">{st.session_state.sets_ganhos_a} Set(s)</td>
-                            <td style="text-align: center; color: #666; font-size: 13px; padding-top: 5px;">Placar do Set</td>
-                            <td style="text-align: left; color: #00ff00; font-size: 16px; font-weight: bold; padding-left: 15px;">{st.session_state.sets_ganhos_b} Set(s)</td>
-                        </tr>
-                    </table>
-                </div>
-                <div style="color: #888; font-size: 13px; margin-top: 15px;">Parciais anteriores: {', '.join(st.session_state.historico_parciais) if st.session_state.historico_parciais else 'Nenhuma'}</div>
-            </div>
-            """, 
-            unsafe_allow_html=True
-        )
+        jugadores_a = df_jogadores[df_jogadores["time"] == time_a_sel]
+        jugadores_b = df_jogadores[df_jogadores["time"] == time_b_sel]
 
-        st.markdown("### 🎯 Atribuir Pontos aos Atletas em Quadra:")
-        col_quadra_a, col_quadra_b = st.columns(2)
-        with col_quadra_a:
-            st.markdown(f"**Jogadores de {time_a_sel}**")
-            for _, row in jugadores_a.iterrows():
-                j_id = row["id"]
-                c_img, c_txt, c_btn = st.columns([1, 2, 1])
-                with c_img:
-                    st.image(obter_imagem_atleta(row["foto_jogador"]), width=60)
-                with c_txt:
-                    nome_quadra = row["apelido"] if pd.notna(row["apelido"]) and str(row["apelido"]).strip() != "" else row["nome"]
-                    pos_txt = f" ({row['posicao']})" if pd.notna(row['posicao']) else ""
-                    st.markdown(f"**{nome_quadra}**{pos_txt}")
-                    st.caption(f"Pontos no jogo: {st.session_state.pontos_jogo_locais.get(j_id, 0)}")
-                with c_btn:
-                    if st.button("➕ Ponto", key=f"ponto_a_{j_id}"):
-                        st.session_state.pontos_jogo_locais[j_id] = st.session_state.pontos_jogo_locais.get(j_id, 0) + 1
-                        st.session_state.placar_set_a += 1
-                        st.rerun()
-
-        with col_quadra_b:
-            st.markdown(f"**Jogadores de {time_b_sel}**")
-            for _, row in jugadores_b.iterrows():
-                j_id = row["id"]
-                c_img, c_txt, c_btn = st.columns([1, 2, 1])
-                with c_img:
-                    st.image(obter_imagem_atleta(row["foto_jogador"]), width=60)
-                with c_txt:
-                    nome_quadra = row["apelido"] if pd.notna(row["apelido"]) and str(row["apelido"]).strip() != "" else row["nome"]
-                    pos_txt = f" ({row['posicao']})" if pd.notna(row['posicao']) else ""
-                    st.markdown(f"**{nome_quadra}**{pos_txt}")
-                    st.caption(f"Pontos no jogo: {st.session_state.pontos_jogo_locais.get(j_id, 0)}")
-                with c_btn:
-                    if st.button("➕ Ponto", key=f"ponto_b_{j_id}"):
-                        st.session_state.pontos_jogo_locais[j_id] = st.session_state.pontos_jogo_locais.get(j_id, 0) + 1
-                        st.session_state.placar_set_b += 1
-                        st.rerun()
-
-        st.markdown("---")
-        col_ctrl1, col_ctrl2 = st.columns(2)
-        with col_ctrl1:
-            if st.button("🔔 Confirmar Fim do Set Atual", use_container_width=True):
-                pa, pb = st.session_state.placar_set_a, st.session_state.placar_set_b
-                st.session_state.historico_parciais.append(f"{pa}-{pb}")
-                if pa > pb:
-                    st.session_state.sets_ganhos_a += 1
-                else:
-                    st.session_state.sets_ganhos_b += 1
+        if jugadores_a.empty or jugadores_b.empty:
+            st.warning("Ambas as seleções precisam ter atletas cadastrados para iniciar a partida.")
+        else:
+            st.markdown("---")
+            if "partida_ativa" not in st.session_state:
+                st.session_state.pontos_jogo_locais = {row["id"]: 0 for _, row in pd.concat([jugadores_a, jugadores_b]).iterrows()}
+                st.session_state.set_atual = 1
+                st.session_state.historico_parciais = []
+                st.session_state.sets_ganhos_a = 0
+                st.session_state.sets_ganhos_b = 0
                 st.session_state.placar_set_a = 0
                 st.session_state.placar_set_b = 0
-                st.session_state.set_atual += 1
-                st.rerun()
+                st.session_state.partida_ativa = True
 
-        with col_ctrl2:
-            if st.button("💾 Finalizar Partida e Salvar no Banco", use_container_width=True, type="primary"):
-                string_final_sets = ", ".join(st.session_state.historico_parciais)
-                if salvar_partida_e_estatisticas(
-                    time_a_sel, time_b_sel, 
-                    st.session_state.sets_ganhos_a, st.session_state.sets_ganhos_b, 
-                    string_final_sets, st.session_state.pontos_jogo_locais
-                ):
-                    st.success("Partida salva com sucesso na nuvem!")
-                    if "partida_ativa" in st.session_state:
-                        del st.session_state.partida_ativa
+            st.markdown(
+                f"""
+                <div style="background-color: #1a1a1a; padding: 25px; border-radius: 15px; border: 3px solid #ff4b4b; text-align: center; margin-bottom: 25px; box-shadow: 0px 8px 16px rgba(0,0,0,0.3);">
+                    <div style="color: #ff4b4b; font-weight: bold; letter-spacing: 2px; font-size: 14px; margin-bottom: 10px; font-family: monospace;">SET {st.session_state.set_atual} EM ANDAMENTO (ADMIN MODE)</div>
+                    <div style="display: block; margin: 0 auto; text-align: center;">
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <tr>
+                                <td style="width: 40%; text-align: right; color: white; font-size: 22px; font-weight: bold; padding-right: 15px;">{time_a_sel}</td>
+                                <td style="width: 20%; text-align: center; color: #ff4b4b; font-size: 45px; font-weight: bold; font-family: monospace; background: #000; border-radius: 8px; padding: 5px 10px;">
+                                    {st.session_state.placar_set_a} <span style="color: #444; font-size: 25px;">:</span> {st.session_state.placar_set_b}
+                                </td>
+                                <td style="width: 40%; text-align: left; color: white; font-size: 22px; font-weight: bold; padding-left: 15px;">{time_b_sel}</td>
+                            </tr>
+                            <tr>
+                                <td style="text-align: right; color: #00ff00; font-size: 16px; font-weight: bold; padding-right: 15px;">{st.session_state.sets_ganhos_a} Set(s)</td>
+                                <td style="text-align: center; color: #666; font-size: 13px; padding-top: 5px;">Placar do Set</td>
+                                <td style="text-align: left; color: #00ff00; font-size: 16px; font-weight: bold; padding-left: 15px;">{st.session_state.sets_ganhos_b} Set(s)</td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div style="color: #888; font-size: 13px; margin-top: 15px;">Parciais anteriores: {', '.join(st.session_state.historico_parciais) if st.session_state.historico_parciais else 'Nenhuma'}</div>
+                </div>
+                """, 
+                unsafe_allow_html=True
+            )
+
+            st.markdown("### 🎯 Atribuir Pontos aos Atletas em Quadra:")
+            col_quadra_a, col_quadra_b = st.columns(2)
+            with col_quadra_a:
+                st.markdown(f"**Jogadores de {time_a_sel}**")
+                for _, row in jugadores_a.iterrows():
+                    j_id = row["id"]
+                    c_img, c_txt, c_btn = st.columns([1, 2, 1])
+                    with c_img:
+                        st.image(obter_imagem_atleta(row["foto_jogador"]), width=60)
+                    with c_txt:
+                        nome_quadra = row["apelido"] if pd.notna(row["apelido"]) and str(row["apelido"]).strip() != "" else row["nome"]
+                        st.markdown(f"**{nome_quadra}**")
+                        st.caption(f"Pontos no jogo: {st.session_state.pontos_jogo_locais.get(j_id, 0)}")
+                    with c_btn:
+                        if st.button("➕ Ponto", key=f"ponto_a_{j_id}"):
+                            st.session_state.pontos_jogo_locais[j_id] = st.session_state.pontos_jogo_locais.get(j_id, 0) + 1
+                            st.session_state.placar_set_a += 1
+                            st.rerun()
+
+            with col_quadra_b:
+                st.markdown(f"**Jogadores de {time_b_sel}**")
+                for _, row in jugadores_b.iterrows():
+                    j_id = row["id"]
+                    c_img, c_txt, c_btn = st.columns([1, 2, 1])
+                    with c_img:
+                        st.image(obter_imagem_atleta(row["foto_jogador"]), width=60)
+                    with c_txt:
+                        nome_quadra = row["apelido"] if pd.notna(row["apelido"]) and str(row["apelido"]).strip() != "" else row["nome"]
+                        st.markdown(f"**{nome_quadra}**")
+                        st.caption(f"Pontos no jogo: {st.session_state.pontos_jogo_locais.get(j_id, 0)}")
+                    with c_btn:
+                        if st.button("➕ Ponto", key=f"ponto_b_{j_id}"):
+                            st.session_state.pontos_jogo_locais[j_id] = st.session_state.pontos_jogo_locais.get(j_id, 0) + 1
+                            st.session_state.placar_set_b += 1
+                            st.rerun()
+
+            st.markdown("---")
+            col_ctrl1, col_ctrl2 = st.columns(2)
+            with col_ctrl1:
+                if st.button("🔔 Confirmar Fim do Set Atual", use_container_width=True):
+                    pa, pb = st.session_state.placar_set_a, st.session_state.placar_set_b
+                    st.session_state.historico_parciais.append(f"{pa}-{pb}")
+                    if pa > pb:
+                        st.session_state.sets_ganhos_a += 1
+                    else:
+                        st.session_state.sets_ganhos_b += 1
+                    st.session_state.placar_set_a = 0
+                    st.session_state.placar_set_b = 0
+                    st.session_state.set_atual += 1
                     st.rerun()
 
-        if st.button("🔄 Resetar Placar Local (Cancelar Jogo)", type="secondary"):
-            if "partida_ativa" in st.session_state:
-                del st.session_state.partida_ativa
-            st.rerun()
+            with col_ctrl2:
+                if st.button("💾 Finalizar Partida e Salvar no Banco", use_container_width=True, type="primary"):
+                    string_final_sets = ", ".join(st.session_state.historico_parciais)
+                    if salvar_partida_e_estatisticas(
+                        time_a_sel, time_b_sel, 
+                        st.session_state.sets_ganhos_a, st.session_state.sets_ganhos_b, 
+                        string_final_sets, st.session_state.pontos_jogo_locais
+                    ):
+                        st.success("Partida salva com sucesso na nuvem!")
+                        if "partida_ativa" in st.session_state:
+                            del st.session_state.partida_ativa
+                        st.rerun()                                          
 
 # --- ABA 4: HISTÓRICO DE JOGOS ---
 with aba_historico:
