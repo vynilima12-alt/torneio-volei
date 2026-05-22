@@ -338,7 +338,6 @@ with aba_confronto:
         st.warning("🔒 Apenas administradores autorizados podem iniciar partidas ou computar pontos.")
         st.info("Por favor, vá até a aba '🔒 Painel Admin' e insira a senha master para liberar este recurso.")
     else:
-        # Todo o seu código antigo do Modo Confronto roda aqui dentro do 'else'
         c_t1, c_t2 = st.columns(2)
         with c_t1:
             time_a_sel = st.selectbox("Selecione o Time A:", options=TODOS_TIMES, index=0)
@@ -451,14 +450,13 @@ with aba_confronto:
                         st.success("Partida salva com sucesso na nuvem!")
                         if "partida_ativa" in st.session_state:
                             del st.session_state.partida_ativa
-                        st.rerun()                                          
+                        st.rerun()                                          
 
 # --- ABA 4: HISTÓRICO DE JOGOS (EXIBINDO PONTUADORES) ---
 with aba_historico:
     st.header("📜 Histórico de Partidas Realizadas")
     if not df_partidas.empty:
         for _, partida in df_partidas.iterrows():
-            # Confere se a coluna nova existe na linha para não bugar jogos antigos
             detalhes = partida['detalhes_pontos'] if 'detalhes_pontos' in partida and pd.notna(partida['detalhes_pontos']) else "Sem dados de pontuadores individuais."
             
             st.markdown(
@@ -489,7 +487,7 @@ with aba_admin:
         st.session_state.admin_logado = True
         st.success("Acesso administrativo liberado. O 'Modo Confronto' agora está desbloqueado!")
 
-# NOVO PAINEL DE CONTROLE DE CAMPEONATO
+        # NOVO PAINEL DE CONTROLE DE CAMPEONATO
         st.markdown("---")
         st.subheader("🚨 ZERAR E RESETAR TORNEIO")
         st.warning("Atenção: O botão abaixo vai zerar a pontuação de TODOS os atletas no banco de dados. Use apenas se for começar uma nova temporada!")
@@ -505,7 +503,7 @@ with aba_admin:
             else:
                 st.error("Por favor, marque a caixa de confirmação antes de resetar.")        
         
-       ==========================================
+        # ==========================================
         # 1. FORMULÁRIO COMPACTO DE CADASTRO
         # ==========================================
         st.markdown("---")
@@ -530,7 +528,7 @@ with aba_admin:
             if botao_cadastrar:
                 qtd_atual = len(df_jogadores[df_jogadores["time"] == time_novo])
                 if qtd_atual >= 4:
-                    st.error(f"A seleção do {time_novo} já atingiu o limite de 4 jogadores.")
+                    st.error(f"A seleção do {time_novo} ya atingiu o limite de 4 jogadores.")
                 elif nome_novo:
                     emoji_flag = time_novo.split()[0]
                     string_foto = converter_imagem_para_base64(arquivo_foto)
@@ -585,7 +583,7 @@ with aba_admin:
                     st.success("Jogador removido com sucesso.")
                     st.rerun()
                 elif not confirma_atleta:
-                    st.error("Marque a caixa de confirmação para deletar o atleta.")
+                    st.error("Marque a caixa de confirmação para deletar a atleta.")
         else:
             st.info("Nenhum atleta cadastrado para edição.")
 
@@ -621,9 +619,11 @@ with aba_admin:
             if st.button("🗑️ Excluir Partida Definitivamente", type="secondary", key=f"btn_del_partida_{id_partida_sel}"):
                 if confirma_partida:
                     if deletar_partida_banco(id_partida_sel):
-                        st.success("Partida deletada e histórico atualizado!")
+                        st.success("Partida deletada e histórico updated!")
                         st.rerun()
                 else:
                     st.error("Marque a caixa de confirmação para deletar a partida.")
         else:
             st.info("Nenhuma partida registrada para edição.")
+    else:
+        st.session_state.admin_logado = False
