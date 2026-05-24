@@ -130,7 +130,7 @@ def inserir_jogador_banco(nome, apelido, time, emoji, foto_base64, idade, posica
             foto_final = f"data:image/png;base64,{foto_base64}"
         dados = {
             "nome": nome, "apelido": apelido, "time": time, "foto_time": emoji, "foto_jogador": foto_final, 
-            "pontos": 0, "ataques": 0, "bloqueios": 0, "aces": 0, "idade": idade, "posicao",: posicao, "altura": altura, "frase": frase
+            "pontos": 0, "ataques": 0, "bloqueios": 0, "aces": 0, "idade": idade, "posicao": posicao, "altura": altura, "frase": frase
         }
         supabase.table("jogadores").insert(dados).execute()
         return True
