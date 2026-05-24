@@ -100,7 +100,8 @@ def salvar_partida_retroativa(fase, time_a, time_b, sets_a, sets_b, placar_sets,
 
         for j_id, stats in stats_jogadores.items():
             if stats["ataques"] > 0 or stats["bloqueios"] > 0 or stats["aces"] > 0:
-                res_j = supabase.table("jogadores").select("ataques, Skinner, bloqueios, aces").eq("id", j_id).execute()
+                # CORRIGIDO: Removido o campo "Skinner" que causava o erro técnico
+                res_j = supabase.table("jogadores").select("ataques, bloqueios, aces").eq("id", j_id).execute()
                 if res_j.data:
                     atq_atual = res_j.data[0]["ataques"] if res_j.data[0]["ataques"] else 0
                     blo_atual = res_j.data[0]["bloqueios"] if res_j.data[0]["bloqueios"] else 0
@@ -129,7 +130,7 @@ def inserir_jogador_banco(nome, apelido, time, emoji, foto_base64, idade, posica
             foto_final = f"data:image/png;base64,{foto_base64}"
         dados = {
             "nome": nome, "apelido": apelido, "time": time, "foto_time": emoji, "foto_jogador": foto_final, 
-            "pontos": 0, "ataques": 0, "bloqueios": 0, "aces": 0, "idade": idade, "posicao": posicao, "altura": altura, "frase": frase
+            "pontos": 0, "ataques": 0, "bloqueios": 0, "aces": 0, "idade": idade, "posicao",: posicao, "altura": altura, "frase": frase
         }
         supabase.table("jogadores").insert(dados).execute()
         return True
@@ -138,7 +139,7 @@ def inserir_jogador_banco(nome, apelido, time, emoji, foto_base64, idade, posica
 
 def deletar_jogador_banco(jogador_id):
     try:
-        supabase.table("jogadores").delete().eq("id", jogador_id).execute()
+        supabase.table("jogadores").delete().eq("id",_jogador_id).execute()
         return True
     except Exception:
         return False
@@ -428,7 +429,7 @@ with aba_admin:
     senha = st.text_input("Senha Master:", type="password")
     if senha == "mikasa123":
         st.session_state.admin_logado = True
-        st.success("Acesso administrativo liberado. O 'Modo Confronto' agora está desbloqueado!")
+        st.success("Acesso administrative liberado. O 'Modo Confronto' agora está desbloqueado!")
 
         st.markdown("---")
         st.subheader("🚨 ZERAR E RESETAR TORNEIO")
