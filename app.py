@@ -9,18 +9,17 @@ from supabase import create_client, Client
 # 1. CONFIGURAÇÕES DA PÁGINA & CONSTANTES
 # =========================================================
 st.set_page_config(page_title="Copa do Mundo de Vôlei 2026", layout="wide")
-st.title("🏐 Copa do Mundo de Vôlei 2026 — Gestão de Confrontos")
+st.title("🏐 Copa do Mundo de Vôlei 2026 — Estatísticas & Confrontos")
 
 FOTO_PADRAO_URL = "https://cdn-icons-png.flaticon.com/512/4333/4333609.png"
 
-# Definição das Seleções Oficiais
 GRUPO_A = ["🇧🇷 Brasil", "🇺🇸 EUA", "🇫🇷 França", "🇯🇵 Japão"]
 GRUPO_B = ["🇩🇪 Alemanha", "🇦🇷 Argentina", "🇪🇸 Espanha", "🇵🇹 Portugal"]
 TODOS_TIMES = GRUPO_A + GRUPO_B
 
 LISTA_POSICOES = ["Ponteiro(a)", "Central", "Levantador(a)", "Oposto(a)", "Líbero"]
+FASES_TORNEIO = ["Jogo 1", "Jogo 2", "Jogo 3", "Quartas de Final", "Semifinal", "Disputa de 3º Lugar", "Grande Final"]
 
-# LINKS DEFINITIVOS E SEGUROS DO POSTIMAGES (Fundo limpo do seu Canva)
 LINKS_FUNDOS_LIMPOS = {
     "🇧🇷 Brasil": "https://i.postimg.cc/t4vHWsFP/Brasil.png",
     "🇺🇸 EUA": "https://i.postimg.cc/52KMLX8L/EUA.png",
@@ -44,36 +43,80 @@ def carregar_dados_banco():
         response = supabase.table("jogadores").select("*").execute()
         if response.data:
             df = pd.DataFrame(response.data)
-            for col in ["apelido", "idade", "posicao", "altura", "frase"]:
+            # Garante que as novas colunas de fundamentos existam no DataFrame
+            for col in ["ataques", "bloqueios", "aces", "apelido", "idade", "posicao", "altura", "frase"]:
                 if col not in df.columns:
-                    df[col] = None
+                    df[col] = 0 if col in ["ataques", "bloqueios", "aces"] else None
+            
+            # Converte nulos para zero nos fundamentos
+            df["ataques"] = df["ataques"].fillna(0).astype(int)
+            df["bloqueios"] = df["bloqueios"].fillna(0).astype(int)
+            df["aces"] = df["aces"].fillna(0).astype(int)
+            # Total é a soma dos fundamentos
+            df["pontos"] = df["ataques"] + df["bloqueios"] + df["aces"]
+            
             if "id" in df.columns:
                 return df.sort_values(by="id").reset_index(drop=True)
             return df.sort_values(by="nome").reset_index(drop=True)
-        return pd.DataFrame(columns=["id", "nome", "apelido", "time", "pontos", "foto_time", "foto_jogador", "idade", "posicao", "altura", "frase"])
+        return pd.DataFrame(columns=["id", "nome", "apelido", "time", "ataques", "bloqueios", "aces", "pontos", "foto_time", "foto_jogador", "idade", "posicao", "altura", "frase"])
     except Exception:
-        return pd.DataFrame(columns=["id", "nome", "apelido", "time", "pontos", "foto_time", "foto_jogador", "idade", "posicao", "altura", "frase"])
+        return pd.DataFrame(columns=["id", "nome", "apelido", "time", "ataques", "bloqueios", "aces", "pontos", "foto_time", "foto_jogador", "idade", "posicao", "altura", "frase"])
 
 def carregar_partidas_banco():
     try:
         response = supabase.table("partidas").select("*").execute()
         if response.data:
-            return pd.DataFrame(response.data).sort_values(by="id", ascending=False).reset_index(drop=True)
-        return pd.DataFrame(columns=["id", "time_a", "time_b", "sets_a", "sets_b", "placar_sets"])
+            df = pd.DataFrame(response.data)
+            if "fase" not in df.columns:
+                df["fase"] = "Fase de Grupos"
+            return df.sort_values(by="id", ascending=False).reset_index(drop=True)
+        return pd.DataFrame(columns=["id", "time_a", "time_b", "sets_a", "sets_b", "placar_sets", "fase", "detalhes_pontos"])
     except Exception:
-        return pd.DataFrame(columns=["id", "time_a", "time_b", "sets_a", "sets_b", "placar_sets"])
-    
-def atualizar_partida_banco(partida_id, sets_a, sets_b, placar_sets):
+        return pd.DataFrame(columns=["id", "time_a", "time_b", "sets_a", "sets_b", "placar_sets", "fase", "detalhes_pontos"])
+
+def zerar_rankings_banco():
     try:
-        dados = {"sets_a": sets_a, "sets_b": sets_b, "placar_sets": placar_sets}
-        supabase.table("partidas").update(dados).eq("id", partida_id).execute()
+        supabase.table("jogadores").update({"ataques": 0, "bloqueios": 0, "aces": 0, "pontos": 0}).neq("id", 0).execute()
         return True
     except Exception:
         return False
 
-def zerar_rankings_banco():
+def salvar_partida_retroativa(fase, time_a, time_b, sets_a, sets_b, placar_sets, stats_jogadores):
     try:
-        supabase.table("jogadores").update({"pontos": 0}).neq("id", 0).execute()
+        # 1. Monta o texto resumo dos pontuadores para o histórico
+        linhas_detalhe = []
+        for j_id, stats in stats_jogadores.items():
+            tot = stats["ataques"] + stats["bloqueios"] + stats["aces"]
+            if tot > 0:
+                res_j = supabase.table("jogadores").select("apelido, nome").eq("id", j_id).execute()
+                if res_j.data:
+                    nome_f = res_j.data[0]["apelido"] if res_j.data[0]["apelido"] else res_j.data[0]["nome"]
+                    linhas_detalhe.append(f"{nome_f}: {tot} Pts (Atq: {stats['ataques']}, Bloq: {stats['bloqueios']}, Ace: {stats['aces']})")
+        
+        txt_detalhes = " | ".join(linhas_detalhe) if lines_detalhe else "Sem pontuações individuais salvas."
+
+        # 2. Salva a partida na tabela 'partidas'
+        dados_partida = {
+            "fase": fase, "time_a": time_a, "time_b": time_b,
+            "sets_a": sets_a, "sets_b": sets_b, "placar_sets": placar_sets,
+            "detalhes_pontos": txt_detalhes
+        }
+        supabase.table("partidas").insert(dados_partida).execute()
+
+        # 3. Atualiza o acumulado de cada fundamento na tabela 'jogadores'
+        for j_id, stats in stats_jogadores.items():
+            if stats["ataques"] > 0 or stats["bloqueios"] > 0 or stats["aces"] > 0:
+                res_j = supabase.table("jogadores").select("ataques, bloqueios, aces").eq("id", j_id).execute()
+                if res_j.data:
+                    atq_atual = res_j.data[0]["ataques"] if res_j.data[0]["ataques"] else 0
+                    blo_atual = res_j.data[0]["bloqueios"] if res_j.data[0]["bloqueios"] else 0
+                    ace_atual = res_j.data[0]["aces"] if res_j.data[0]["aces"] else 0
+
+                    supabase.table("jogadores").update({
+                        "ataques": atq_atual + stats["ataques"],
+                        "bloqueios": blo_atual + stats["bloqueios"],
+                        "aces": ace_atual + stats["aces"]
+                    }).eq("id", j_id).execute()
         return True
     except Exception:
         return False
@@ -85,37 +128,6 @@ def deletar_partida_banco(partida_id):
     except Exception:
         return False
 
-def salvar_partida_e_estatisticas(time_a, time_b, sets_a, sets_b, string_sets, pontos_partida_dict):
-    try:
-        texto_pontuadores = []
-        for j_id, pts in pontos_partida_dict.items():
-            if pts > 0:
-                res_j = supabase.table("jogadores").select("apelido, nome").eq("id", j_id).execute()
-                if res_j.data:
-                    nome_exibir = res_j.data[0]["apelido"] if res_j.data[0]["apelido"] else res_j.data[0]["nome"]
-                    texto_pontuadores.append(f"{nome_exibir} ({pts})")
-        
-        string_detalhe_pontos = ", ".join(texto_pontuadores) if texto_pontuadores else "Nenhum ponto individual registrado"
-
-        dados_partida = {
-            "time_a": time_a, "time_b": time_b,
-            "sets_a": sets_a, "sets_b": sets_b, 
-            "placar_sets": string_sets,
-            "detalhes_pontos": string_detalhe_pontos
-        }
-        supabase.table("partidas").insert(dados_partida).execute()
-        
-        for jogador_id, pontos_ganhos in pontos_partida_dict.items():
-            if pontos_ganhos > 0:
-                res = supabase.table("jogadores").select("pontos").eq("id", int(jogador_id)).execute()
-                if res.data:
-                    pontos_atuais = res.data[0]["pontos"]
-                    novo_total = pontos_atuais + pontos_ganhos
-                    supabase.table("jogadores").update({"pontos": novo_total}).eq("id", int(jogador_id)).execute()
-        return True
-    except Exception:
-        return False       
-
 def inserir_jogador_banco(nome, apelido, time, emoji, foto_base64, idade, posicao, altura, frase):
     try:
         foto_final = foto_base64
@@ -123,16 +135,9 @@ def inserir_jogador_banco(nome, apelido, time, emoji, foto_base64, idade, posica
             foto_final = f"data:image/png;base64,{foto_base64}"
         dados = {
             "nome": nome, "apelido": apelido, "time": time, "foto_time": emoji, "foto_jogador": foto_final, 
-            "pontos": 0, "idade": idade, "posicao": posicao, "altura": altura, "frase": frase
+            "pontos": 0, "ataques": 0, "bloqueios": 0, "aces": 0, "idade": idade, "posicao": posicao, "altura": altura, "frase": frase
         }
         supabase.table("jogadores").insert(dados).execute()
-        return True
-    except Exception:
-        return False
-
-def deletar_jogador_banco(jogador_id):
-    try:
-        supabase.table("jogadores").delete().eq("id", jogador_id).execute()
         return True
     except Exception:
         return False
@@ -148,15 +153,6 @@ def editar_jogador_banco(jogador_id, novo_nome, novo_apelido, novo_time, novo_em
     except Exception:
         return False
 
-def converter_imagem_para_base64(arquivo_imagem):
-    if arquivo_imagem is not None:
-        img = Image.open(arquivo_imagem)
-        img = ImageOps.fit(img, (150, 150), Image.Resampling.LANCZOS)
-        buffered = io.BytesIO()
-        img.save(buffered, format="PNG")
-        return base64.b64encode(buffered.getvalue()).decode()
-    return ""
-
 def obter_imagem_atleta(dados_foto):
     if pd.isna(dados_foto) or str(dados_foto).strip() == "":
         return FOTO_PADRAO_URL
@@ -170,6 +166,15 @@ def obter_imagem_atleta(dados_foto):
     except Exception:
         return FOTO_PADRAO_URL
 
+def converter_imagem_para_base64(arquivo_imagem):
+    if arquivo_imagem is not None:
+        img = Image.open(arquivo_imagem)
+        img = ImageOps.fit(img, (150, 150), Image.Resampling.LANCZOS)
+        buffered = io.BytesIO()
+        img.save(buffered, format="PNG")
+        return base64.b64encode(buffered.getvalue()).decode()
+    return ""
+
 df_jogadores = carregar_dados_banco()
 df_partidas = carregar_partidas_banco()
 
@@ -182,75 +187,51 @@ if "admin_logado" not in st.session_state:
 aba_ranking, aba_elenco, aba_confronto, aba_historico, aba_admin = st.tabs([
     "📊 Classificação & Estatísticas", 
     "🏃‍♂️ Elenco & Fichas",
-    "⚔️ Modo Confronto", 
+    "⚔️ Registrar Partida (Finais/Grupos)", 
     "📜 Histórico de Jogos",
     "🔒 Painel Admin"
 ])
 
-# --- ABA 1: RANKINGS ---
+# --- ABA 1: RANKINGS (COM COLUNAS DE ATAQUE, BLOQUEIO, ACE E TOTAL) ---
 with aba_ranking:
     if not df_jogadores.empty:
-        col1, col2 = st.columns(2)
+        col1, col2 = st.columns([2, 3])
         with col1:
-            st.header("🏆 Pontuação por Seleção")
+            st.header("🏆 Classificação por Seleção")
             ranking_times = df_jogadores.groupby("time")["pontos"].sum().reset_index()
             ranking_times = ranking_times.sort_values(by="pontos", ascending=False)
-            st.dataframe(ranking_times, column_config={"time": "Seleção", "pontos": "Pontos Corridos"}, hide_index=True, use_container_width=True)
+            st.dataframe(ranking_times, column_config={"time": "Seleção", "pontos": "Pontos Totais Conquistados"}, hide_index=True, use_container_width=True)
             
         with col2:
-            st.header("🔥 Artilharia Individual (MVP)")
+            st.header("🔥 Scout Geral de Atletas (Ranking Completo)")
             ranking_jogadores = df_jogadores.sort_values(by="pontos", ascending=False).copy()
-            ranking_jogadores["foto_jogador"] = ranking_jogadores["foto_jogador"].apply(
-                lambda x: f"data:image/png;base64,{str(x).split('base64,')[-1]}" if pd.notna(x) and str(x).strip() != "" and not str(x).startswith("http") else (x if pd.notna(x) else FOTO_PADRAO_URL)
-            )
             ranking_jogadores["exibir_nome"] = ranking_jogadores["apelido"].fillna(ranking_jogadores["nome"])
+            
+            # Configura a tabela exibindo todas as colunas de fundamentos solicitadas
             st.dataframe(
-                ranking_jogadores[["foto_jogador", "exibir_nome", "time", "pontos"]],
+                ranking_jogadores[["exibir_nome", "time", "ataques", "bloqueios", "aces", "pontos"]],
                 column_config={
-                    "foto_jogador": st.column_config.ImageColumn("Perfil", width="small"),
-                    "exibir_nome": "Atleta", "time": "Seleção", "pontos": "Pontos Totais"
+                    "exibir_nome": "Atleta", 
+                    "time": "Seleção", 
+                    "ataques": "⚔️ Ataques", 
+                    "bloqueios": "🧱 Bloqueios", 
+                    "aces": "🎯 Aces", 
+                    "pontos": "📊 TOTAL"
                 },
                 hide_index=True, use_container_width=True
             )
     else:
         st.info("Nenhum atleta cadastrado no torneio.")
 
-# --- ABA 2: ELENCO & FICHAS (MODO ÁLBUM DE FIGURINHAS CARROSSEL PREMIUM) ---
+# --- ABA 2: ELENCO & FICHAS (MODO ÁLBUM CARROSSEL) ---
 with aba_elenco:
     st.header("📖 Álbum de Figurinhas Premium — Copa 2026")
-    
-    st.markdown(
-        """
-        <style>
-        .carrossel-container {
-            display: flex;
-            flex-wrap: nowrap;
-            overflow-x: auto;
-            gap: 15px;
-            padding: 10px 5px 20px 5px;
-            scroll-behavior: smooth;
-            -webkit-overflow-scrolling: touch;
-        }
-        .carrossel-container::-webkit-scrollbar {
-            height: 6px;
-        }
-        .carrossel-container::-webkit-scrollbar-thumb {
-            background-color: #333;
-            border-radius: 10px;
-        }
-        </style>
-        """, 
-        unsafe_allow_html=True
-    )
-    
     if not df_jogadores.empty:
         for time in TODOS_TIMES:
             atletas_do_time = df_jogadores[df_jogadores["time"].str.strip() == time.strip()]
-            
             if not atletas_do_time.empty:
                 st.markdown(f"### {time}")
                 html_carrossel = '<div class="carrossel-container">'
-                
                 for idx, (_, atleta) in enumerate(atletas_do_time.reset_index().iterrows()):
                     link_fundo_time = LINKS_FUNDOS_LIMPOS.get(time, FOTO_PADRAO_URL)
                     dados_foto = atleta["foto_jogador"]
@@ -271,16 +252,7 @@ with aba_elenco:
                     frase_atleta = str(atleta["frase"]).upper() if pd.notna(atleta["frase"]) and str(atleta["frase"]).strip() != "" else "COPA DO MUNDO 2026"
                     
                     html_carrossel += (
-                        f'<div style="'
-                        f'  flex: 0 0 auto; '
-                        f'  width: 200px; '
-                        f'  height: 300px; '
-                        f'  border-radius: 6px; '
-                        f'  position: relative; '
-                        f'  overflow: hidden; '
-                        f'  font-family: \'Arial\', sans-serif; '
-                        f'  box-shadow: 0px 6px 12px rgba(0,0,0,0.5);'
-                        f'">'
+                        f'<div style="flex: 0 0 auto; width: 200px; height: 300px; border-radius: 6px; position: relative; overflow: hidden; font-family: \'Arial\', sans-serif; box-shadow: 0px 6px 12px rgba(0,0,0,0.5);">'
                         f'  <img src="{link_fundo_time}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1;">'
                         f'  <div style="position: absolute; top: 8px; left: 8px; background: linear-gradient(180deg, #ffffff 0%, #cccccc 100%); min-width: 28px; padding: 0 4px; height: 32px; display: flex; align-items: center; justify-content: center; box-shadow: 1px 1px 4px rgba(0,0,0,0.4); z-index: 10; border-radius: 2px;">'
                         f'    <span style="color: #1b47ff; font-size: 13px; font-weight: 900;">{letra_posicao}</span>'
@@ -299,140 +271,120 @@ with aba_elenco:
                 st.markdown(html_carrossel, unsafe_allow_html=True)
                 st.markdown("<br>", unsafe_allow_html=True)
     else:
-        st.info("Nenhum atleta cadastrado para montar o álbum.")
+        st.info("Nenhum atleta cadastrado.")
 
-# --- ABA 3: MODO CONFRONTO (BLINDADO POR SENHA) ---
+# --- ABA 3: REGISTRO DE CONFRONTE RETROATIVO COM CABEÇALHOS EDITÁVEIS ---
 with aba_confronto:
-    st.header("⚔️ Gerenciar Partida em Tempo Real")
+    st.header("⚔️ Registrar Partidas Realizadas (Scout de Finais & Grupos)")
     
     if not st.session_state.admin_logado:
-        st.warning("🔒 Apenas administradores autorizados podem iniciar partidas ou computar pontos.")
+        st.warning("🔒 Apenas administradores autorizados podem registrar súmulas ou salvar dados de partidas.")
         st.info("Por favor, vá até a aba '🔒 Painel Admin' e insira a senha master para liberar este recurso.")
     else:
+        st.subheader("📝 Configuração Geral da Partida")
+        
+        # 1. Cabeçalho editável da fase do torneio
+        c_f1, c_f2 = st.columns([2, 2])
+        with c_f1:
+            fase_selecionada = st.selectbox("Escolha ou digite uma Fase/Título do Jogo:", options=FASES_TORNEIO, index=0)
+        with c_f2:
+            fase_customizada = st.text_input("✍️ Personalizar nome da Fase (Opcional - Substitui o campo ao lado):", placeholder="Ex: Grande Final - Jogo de Volta")
+        
+        fase_final_jogo = fase_customizada.strip() if fase_customizada.strip() != "" else fase_selecionada
+
+        # 2. Seleção de Equipes
         c_t1, c_t2 = st.columns(2)
         with c_t1:
-            time_a_sel = st.selectbox("Selecione o Time A:", options=TODOS_TIMES, index=0)
+            time_a_sel = st.selectbox("Selecione o Time A:", options=TODOS_TIMES, index=0, key="retro_ta")
         with c_t2:
             opcoes_time_b = [t for t in TODOS_TIMES if t != time_a_sel]
-            time_b_sel = st.selectbox("Selecione o Time B:", options=opcoes_time_b, index=0)
+            time_b_sel = st.selectbox("Selecione o Time B:", options=opcoes_time_b, index=0, key="retro_tb")
 
+        # 3. Placar e Parciais Gerais do Jogo
+        st.markdown("#### 📊 Placar Geral do Confronto")
+        c_p1, c_p2, c_p3 = st.columns([1, 1, 2])
+        with c_p1:
+            sets_a_final = st.number_input(f"Sets Ganhos por {time_a_sel}:", min_value=0, max_value=3, value=2, step=1)
+        with c_p2:
+            sets_b_final = st.number_input(f"Sets Ganhos por {time_b_sel}:", min_value=0, max_value=3, value=0, step=1)
+        with c_p3:
+            parciais_finais = st.text_input("Parciais das parciais separadas por vírgula:", value="25-18, 25-21", placeholder="Ex: 25-18, 21-25, 15-10")
+
+        # Puxa atletas de ambas as seleções em tempo real
         jugadores_a = df_jogadores[df_jogadores["time"] == time_a_sel]
         jugadores_b = df_jogadores[df_jogadores["time"] == time_b_sel]
 
         if jugadores_a.empty or jugadores_b.empty:
-            st.warning("Ambas as seleções precisam ter atletas cadastrados para iniciar a partida.")
+            st.warning("Ambas as seleções precisam ter atletas cadastrados para registrar a súmula.")
         else:
             st.markdown("---")
-            if "partida_ativa" not in st.session_state:
-                st.session_state.pontos_jogo_locais = {row["id"]: 0 for _, row in pd.concat([jugadores_a, jugadores_b]).iterrows()}
-                st.session_state.set_atual = 1
-                st.session_state.historico_parciais = []
-                st.session_state.sets_ganhos_a = 0
-                st.session_state.sets_ganhos_b = 0
-                st.session_state.placar_set_a = 0
-                st.session_state.placar_set_b = 0
-                st.session_state.partida_ativa = True
+            st.markdown("### 🎯 Scout de Fundamentos por Atleta (Insira o total acumulado que fizeram nesta partida)")
+            
+            # Dicionário temporário para armazenar o input numérico digitado direto pelo usuário
+            stats_inseridas = {}
 
-            st.markdown(
-                f"""
-                <div style="background-color: #1a1a1a; padding: 25px; border-radius: 15px; border: 3px solid #ff4b4b; text-align: center; margin-bottom: 25px; box-shadow: 0px 8px 16px rgba(0,0,0,0.3);">
-                    <div style="color: #ff4b4b; font-weight: bold; letter-spacing: 2px; font-size: 14px; margin-bottom: 10px; font-family: monospace;">SET {st.session_state.set_atual} EM ANDAMENTO (ADMIN MODE)</div>
-                    <div style="display: block; margin: 0 auto; text-align: center;">
-                        <table style="width: 100%; border-collapse: collapse;">
-                            <tr>
-                                <td style="width: 40%; text-align: right; color: white; font-size: 22px; font-weight: bold; padding-right: 15px;">{time_a_sel}</td>
-                                <td style="width: 20%; text-align: center; color: #ff4b4b; font-size: 45px; font-weight: bold; font-family: monospace; background: #000; border-radius: 8px; padding: 5px 10px;">
-                                    {st.session_state.placar_set_a} <span style="color: #444; font-size: 25px;">:</span> {st.session_state.placar_set_b}
-                                </td>
-                                <td style="width: 40%; text-align: left; color: white; font-size: 22px; font-weight: bold; padding-left: 15px;">{time_b_sel}</td>
-                            </tr>
-                            <tr>
-                                <td style="text-align: right; color: #00ff00; font-size: 16px; font-weight: bold; padding-right: 15px;">{st.session_state.sets_ganhos_a} Set(s)</td>
-                                <td style="text-align: center; color: #666; font-size: 13px; padding-top: 5px;">Placar do Set</td>
-                                <td style="text-align: left; color: #00ff00; font-size: 16px; font-weight: bold; padding-left: 15px;">{st.session_state.sets_ganhos_b} Set(s)</td>
-                            </tr>
-                        </table>
-                    </div>
-                    <div style="color: #888; font-size: 13px; margin-top: 15px;">Parciais anteriores: {', '.join(st.session_state.historico_parciais) if st.session_state.historico_parciais else 'Nenhuma'}</div>
-                </div>
-                """, 
-                unsafe_allow_html=True
-            )
+            # Renderiza inputs de Digitação Direta para o Time A
+            st.markdown(f"#### 🏃‍♂️ Atletas de {time_a_sel}")
+            for _, row in jugadores_a.iterrows():
+                j_id = row["id"]
+                nome_f = row["apelido"] if pd.notna(row["apelido"]) and str(row["apelido"]).strip() != "" else row["nome"]
+                
+                c_img, c_nome, c_atq, c_blo, c_ace = st.columns([0.6, 1.4, 1, 1, 1])
+                with c_img:
+                    st.image(obter_imagem_atleta(row["foto_jogador"]), width=45)
+                with c_nome:
+                    st.markdown(f"**{nome_f}**")
+                with c_atq:
+                    atq = st.number_input("Ataques:", min_value=0, max_value=60, value=0, key=f"atq_a_{j_id}", step=1)
+                with c_blo:
+                    blo = st.number_input("Bloqueios:", min_value=0, max_value=20, value=0, key=f"blo_a_{j_id}", step=1)
+                with c_ace:
+                    ace = st.number_input("Aces:", min_value=0, max_value=15, value=0, key=f"ace_a_{j_id}", step=1)
+                
+                stats_inseridas[j_id] = {"ataques": atq, "bloqueios": blo, "aces": ace}
+                st.markdown("<div style='margin-top:-10px; border-bottom:1px dashed #333;'></div>", unsafe_allow_html=True)
 
-            st.markdown("### 🎯 Atribuir Pontos aos Atletas em Quadra:")
-            col_quadra_a, col_quadra_b = st.columns(2)
-            with col_quadra_a:
-                st.markdown(f"**Jogadores de {time_a_sel}**")
-                for _, row in jugadores_a.iterrows():
-                    j_id = row["id"]
-                    c_img, c_txt, c_btn = st.columns([1, 2, 1])
-                    with c_img:
-                        st.image(obter_imagem_atleta(row["foto_jogador"]), width=60)
-                    with c_txt:
-                        nome_quadra = row["apelido"] if pd.notna(row["apelido"]) and str(row["apelido"]).strip() != "" else row["nome"]
-                        st.markdown(f"**{nome_quadra}**")
-                        st.caption(f"Pontos no jogo: {st.session_state.pontos_jogo_locais.get(j_id, 0)}")
-                    with c_btn:
-                        if st.button("➕ Ponto", key=f"ponto_a_{j_id}"):
-                            st.session_state.pontos_jogo_locais[j_id] = st.session_state.pontos_jogo_locais.get(j_id, 0) + 1
-                            st.session_state.placar_set_a += 1
-                            st.rerun()
-
-            with col_quadra_b:
-                st.markdown(f"**Jogadores de {time_b_sel}**")
-                for _, row in jugadores_b.iterrows():
-                    j_id = row["id"]
-                    c_img, c_txt, c_btn = st.columns([1, 2, 1])
-                    with c_img:
-                        st.image(obter_imagem_atleta(row["foto_jogador"]), width=60)
-                    with c_txt:
-                        nome_quadra = row["apelido"] if pd.notna(row["apelido"]) and str(row["apelido"]).strip() != "" else row["nome"]
-                        st.markdown(f"**{nome_quadra}**")
-                        st.caption(f"Pontos no jogo: {st.session_state.pontos_jogo_locais.get(j_id, 0)}")
-                    with c_btn:
-                        if st.button("➕ Ponto", key=f"ponto_b_{j_id}"):
-                            st.session_state.pontos_jogo_locais[j_id] = st.session_state.pontos_jogo_locais.get(j_id, 0) + 1
-                            st.session_state.placar_set_b += 1
-                            st.rerun()
+            # Renderiza inputs de Digitação Direta para o Time B
+            st.markdown(f"#### 🏃‍♂️ Atletas de {time_b_sel}")
+            for _, row in jugadores_b.iterrows():
+                j_id = row["id"]
+                nome_f = row["apelido"] if pd.notna(row["apelido"]) and str(row["apelido"]).strip() != "" else row["nome"]
+                
+                c_img, c_nome, c_atq, c_blo, c_ace = st.columns([0.6, 1.4, 1, 1, 1])
+                with c_img:
+                    st.image(obter_imagem_atleta(row["foto_jogador"]), width=45)
+                with c_nome:
+                    st.markdown(f"**{nome_f}**")
+                with c_atq:
+                    atq = st.number_input("Ataques:", min_value=0, max_value=60, value=0, key=f"atq_b_{j_id}", step=1)
+                with c_blo:
+                    blo = st.number_input("Bloqueios:", min_value=0, max_value=20, value=0, key=f"blo_b_{j_id}", step=1)
+                with c_ace:
+                    ace = st.number_input("Aces:", min_value=0, max_value=15, value=0, key=f"ace_b_{j_id}", step=1)
+                
+                stats_inseridas[j_id] = {"ataques": atq, "bloqueios": blo, "aces": ace}
+                st.markdown("<div style='margin-top:-10px; border-bottom:1px dashed #333;'></div>", unsafe_allow_html=True)
 
             st.markdown("---")
-            col_ctrl1, col_ctrl2 = st.columns(2)
-            with col_ctrl1:
-                if st.button("🔔 Confirmar Fim do Set Atual", use_container_width=True):
-                    pa, pb = st.session_state.placar_set_a, st.session_state.placar_set_b
-                    st.session_state.historico_parciais.append(f"{pa}-{pb}")
-                    if pa > pb:
-                        st.session_state.sets_ganhos_a += 1
-                    else:
-                        st.session_state.sets_ganhos_b += 1
-                    st.session_state.placar_set_a = 0
-                    st.session_state.placar_set_b = 0
-                    st.session_state.set_atual += 1
+            if st.button("💾 Computar e Gravar Partida Definitivamente", type="primary", use_container_width=True):
+                if salvar_partida_retroativa(fase_final_jogo, time_a_sel, time_b_sel, sets_a_final, sets_b_final, parciais_finais, stats_inseridas):
+                    st.success(f"Partida da '{fase_final_jogo}' cadastrada com sucesso e estatísticas computadas!")
                     st.rerun()
+                else:
+                    st.error("Erro técnico ao salvar dados no Supabase. Cheque as conexões.")
 
-            with col_ctrl2:
-                if st.button("💾 Finalizar Partida e Salvar no Banco", use_container_width=True, type="primary"):
-                    string_final_sets = ", ".join(st.session_state.historico_parciais)
-                    if salvar_partida_e_estatisticas(
-                        time_a_sel, time_b_sel, 
-                        st.session_state.sets_ganhos_a, st.session_state.sets_ganhos_b, 
-                        string_final_sets, st.session_state.pontos_jogo_locais
-                    ):
-                        st.success("Partida salva com sucesso na nuvem!")
-                        if "partida_ativa" in st.session_state:
-                            del st.session_state.partida_ativa
-                        st.rerun()                                          
-
-# --- ABA 4: HISTÓRICO DE JOGOS (EXIBINDO PONTUADORES) ---
+# --- ABA 4: HISTÓRICO DE JOGOS COM EXIBIÇÃO DA FASE DO JOGO ---
 with aba_historico:
     st.header("📜 Histórico de Partidas Realizadas")
     if not df_partidas.empty:
         for _, partida in df_partidas.iterrows():
-            detalhes = partida['detalhes_pontos'] if 'detalhes_pontos' in partida and pd.notna(partida['detalhes_pontos']) else "Sem dados de pontuadores individuais."
+            detalhes = partida['detalhes_pontos'] if 'detalhes_pontos' in partida and pd.notna(partida['detalhes_pontos']) else "Sem dados de fundamentos individuais registrados."
+            fase_card = partida['fase'] if 'fase' in partida and pd.notna(partida['fase']) else "Fase de Grupos"
             
             st.markdown(
                 f"""
                 <div style="background-color: #ffffff; padding: 20px; border-radius: 12px; margin-bottom: 15px; border-left: 6px solid #ff4b4b; box-shadow: 0px 4px 6px rgba(0,0,0,0.05);">
+                    <div style="color: #ff4b4b; font-family: monospace; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px;">{fase_card}</div>
                     <h3 style='margin: 0; color: #1e1e1e; font-family: sans-serif; font-size: 20px;'>
                         {partida['time_a']} <span style='color: #ff4b4b;'>{partida['sets_a']}</span> 
                         <span style='color: #cccccc; font-size: 16px;'> x </span> 
@@ -441,8 +393,8 @@ with aba_historico:
                     <p style='color: #666666; font-size: 14px; margin: 8px 0 0 0; font-family: sans-serif;'>
                         📊 <b>Parciais:</b> {partida['placar_sets'] if partida['placar_sets'] else 'Sem parciais gravadas'}
                     </p>
-                    <p style='color: #1b47ff; font-size: 13px; margin: 5px 0 0 0; font-family: sans-serif; font-weight: bold;'>
-                        🎯 <b>Pontuadores:</b> <span style='color: #444444; font-weight: normal;'>{detalhes}</span>
+                    <p style='color: #1b47ff; font-size: 12px; margin: 6px 0 0 0; font-family: sans-serif;'>
+                        🎯 <b>Scout Detalhado:</b> <span style='color: #444444;'>{detalhes}</span>
                     </p>
                 </div>
                 """, 
@@ -460,13 +412,13 @@ with aba_admin:
 
         st.markdown("---")
         st.subheader("🚨 ZERAR E RESETAR TORNEIO")
-        st.warning("Atenção: O botão abaixo vai zerar a pontuação de TODOS os atletas no banco de dados. Use apenas se for começar uma nova temporada!")
+        st.warning("Atenção: O botão abaixo vai zerar TODOS os fundamentos (Ataques, Bloqueios, Aces e Totais) dos atletas no banco de dados. Use apenas para novas temporadas!")
         
-        confirmou_reset = st.checkbox("Estou ciente de que isso vai zerar os pontos do ranking individual e por equipes.")
+        confirmou_reset = st.checkbox("Estou ciente de que isso vai limpar totalmente o ranking acumulado.")
         if st.button("🔄 Zerar Todos os Rankings", type="secondary"):
             if confirmou_reset:
                 if zerar_rankings_banco():
-                    st.success("Rankings zerados com sucesso! Todo mundo começou com 0 pontos.")
+                    st.success("Scout zerado! Todos os jogadores voltaram para 0 pontos.")
                     st.rerun()
                 else:
                     st.error("Erro técnico ao tentar limpar os dados do Supabase.")
@@ -553,7 +505,7 @@ with aba_admin:
                     st.success("Jogador removido com sucesso.")
                     st.rerun()
                 elif not confirma_atleta:
-                    st.error("Marque a caixa de confirmação para deletar o atleta.")
+                    st.error("Marque a caixa de confirmação para deletar a atleta.")
         else:
             st.info("Nenhum atleta cadastrado para edição.")
 
@@ -581,9 +533,12 @@ with aba_admin:
 
                 botao_salvar_partida = st.form_submit_button("💾 Salvar Alterações na Partida", type="primary")
                 if botao_salvar_partida:
-                    if atualizar_partida_banco(id_partida_sel, n_sets_a, n_sets_b, n_parciais):
-                        st.success("Placar do histórico corrigido com sucesso!")
-                        st.rerun()
+                    from supabase import create_client
+                    # Apenas um fallback simples para atualização de parciais antigas
+                    dados = {"sets_a": n_sets_a, "sets_b": n_sets_b, "placar_sets": n_parciais}
+                    supabase.table("partidas").update(dados).eq("id", id_partida_sel).execute()
+                    st.success("Placar do histórico corrigido com sucesso!")
+                    st.rerun()
             
             confirma_partida = st.checkbox("Confirmo a exclusão permanente desta partida do histórico.", key=f"check_del_partida_{id_partida_sel}")
             if st.button("🗑️ Excluir Partida Definitivamente", type="secondary", key=f"btn_del_partida_{id_partida_sel}"):
