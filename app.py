@@ -273,14 +273,18 @@ with aba_elenco:
     else:
         st.info("Nenhum atleta cadastrado.")
 
-# --- ABA 3: REGISTRO DE CONFRONTE RETROATIVO COM CABEÇALHOS EDITÁVEIS ---
+# --- ABA 3: REGISTRO DE CONFRONTO RETROATIVO COM CABEÇALHOS EDITÁVEIS ---
 with aba_confronto:
     st.header("⚔️ Registrar Partidas Realizadas (Scout de Finais & Grupos)")
     
-    if not st.session_state.admin_logado:
-        st.warning("🔒 Apenas administradores autorizados podem registrar súmulas ou salvar dados de partidas.")
-        st.info("Por favor, vá até a aba '🔒 Painel Admin' e insira a senha master para liberar este recurso.")
+    # Campo de senha direto na aba de registro para facilitar o acesso
+    senha_confronto = st.text_input("🔒 Insira a Senha Master para liberar o registro:", type="password", key="senha_aba_confronto")
+    
+    if senha_confronto != "mikasa123":
+        st.warning("🔒 Esta aba é restrita. Digite a senha master para liberar os campos de súmula.")
     else:
+        st.success("🔓 Súmula liberada para registro!")
+        st.markdown("---")
         st.subheader("📝 Configuração Geral da Partida")
         
         # 1. Cabeçalho editável da fase do torneio
@@ -372,7 +376,6 @@ with aba_confronto:
                     st.rerun()
                 else:
                     st.error("Erro técnico ao salvar dados no Supabase. Cheque as conexões.")
-
 # --- ABA 4: HISTÓRICO DE JOGOS COM EXIBIÇÃO DA FASE DO JOGO ---
 with aba_historico:
     st.header("📜 Histórico de Partidas Realizadas")
