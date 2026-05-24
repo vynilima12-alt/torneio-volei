@@ -18,8 +18,8 @@ GRUPO_B = ["🇩🇪 Alemanha", "🇦🇷 Argentina", "🇪🇸 Espanha", "🇵�
 TODOS_TIMES = GRUPO_A + GRUPO_B
 
 LISTA_POSICOES = ["Ponteiro(a)", "Central", "Levantador(a)", "Oposto(a)", "Líbero"]
-FASES_TORNEIO = ["Jogo 1", "Jogo 2", "Jogo 3", "Quartas de Final", "Semifinal", "Disputa de 3º Lugar", "Grande Final"]
 
+# LINKS DEFINITIVOS E SEGUROS DO POSTIMAGES (Fundo limpo do seu Canva)
 LINKS_FUNDOS_LIMPOS = {
     "🇧🇷 Brasil": "https://i.postimg.cc/t4vHWsFP/Brasil.png",
     "🇺🇸 EUA": "https://i.postimg.cc/52KMLX8L/EUA.png",
@@ -43,16 +43,13 @@ def carregar_dados_banco():
         response = supabase.table("jogadores").select("*").execute()
         if response.data:
             df = pd.DataFrame(response.data)
-            # Garante que as novas colunas de fundamentos existam no DataFrame
             for col in ["ataques", "bloqueios", "aces", "apelido", "idade", "posicao", "altura", "frase"]:
                 if col not in df.columns:
                     df[col] = 0 if col in ["ataques", "bloqueios", "aces"] else None
             
-            # Converte nulos para zero nos fundamentos
             df["ataques"] = df["ataques"].fillna(0).astype(int)
             df["bloqueios"] = df["bloqueios"].fillna(0).astype(int)
             df["aces"] = df["aces"].fillna(0).astype(int)
-            # Total é a soma dos fundamentos
             df["pontos"] = df["ataques"] + df["bloqueios"] + df["aces"]
             
             if "id" in df.columns:
@@ -83,7 +80,6 @@ def zerar_rankings_banco():
 
 def salvar_partida_retroativa(fase, time_a, time_b, sets_a, sets_b, placar_sets, stats_jogadores):
     try:
-        # 1. Monta o texto resumo dos pontuadores para o histórico
         linhas_detalhe = []
         for j_id, stats in stats_jogadores.items():
             tot = stats["ataques"] + stats["bloqueios"] + stats["aces"]
@@ -93,9 +89,8 @@ def salvar_partida_retroativa(fase, time_a, time_b, sets_a, sets_b, placar_sets,
                     nome_f = res_j.data[0]["apelido"] if res_j.data[0]["apelido"] else res_j.data[0]["nome"]
                     linhas_detalhe.append(f"{nome_f}: {tot} Pts (Atq: {stats['ataques']}, Bloq: {stats['bloqueios']}, Ace: {stats['aces']})")
         
-        txt_detalhes = " | ".join(linhas_detalhe) if lines_detalhe else "Sem pontuações individuais salvas."
+        txt_detalhes = " | ".join(linhas_detalhe) if linhas_detalhe else "Sem pontuações individuais salvas."
 
-        # 2. Salva a partida na tabela 'partidas'
         dados_partida = {
             "fase": fase, "time_a": time_a, "time_b": time_b,
             "sets_a": sets_a, "sets_b": sets_b, "placar_sets": placar_sets,
@@ -103,10 +98,9 @@ def salvar_partida_retroativa(fase, time_a, time_b, sets_a, sets_b, placar_sets,
         }
         supabase.table("partidas").insert(dados_partida).execute()
 
-        # 3. Atualiza o acumulado de cada fundamento na tabela 'jogadores'
         for j_id, stats in stats_jogadores.items():
             if stats["ataques"] > 0 or stats["bloqueios"] > 0 or stats["aces"] > 0:
-                res_j = supabase.table("jogadores").select("ataques, bloqueios, aces").eq("id", j_id).execute()
+                res_j = supabase.table("jogadores").select("ataques, Skinner, bloqueios, aces").eq("id", j_id).execute()
                 if res_j.data:
                     atq_atual = res_j.data[0]["ataques"] if res_j.data[0]["ataques"] else 0
                     blo_atual = res_j.data[0]["bloqueios"] if res_j.data[0]["bloqueios"] else 0
@@ -138,6 +132,13 @@ def inserir_jogador_banco(nome, apelido, time, emoji, foto_base64, idade, posica
             "pontos": 0, "ataques": 0, "bloqueios": 0, "aces": 0, "idade": idade, "posicao": posicao, "altura": altura, "frase": frase
         }
         supabase.table("jogadores").insert(dados).execute()
+        return True
+    except Exception:
+        return False
+
+def deletar_jogador_banco(jogador_id):
+    try:
+        supabase.table("jogadores").delete().eq("id", jogador_id).execute()
         return True
     except Exception:
         return False
@@ -192,7 +193,7 @@ aba_ranking, aba_elenco, aba_confronto, aba_historico, aba_admin = st.tabs([
     "🔒 Painel Admin"
 ])
 
-# --- ABA 1: RANKINGS (COM COLUNAS DE ATAQUE, BLOQUEIO, ACE E TOTAL) ---
+# --- ABA 1: RANKINGS ---
 with aba_ranking:
     if not df_jogadores.empty:
         col1, col2 = st.columns([2, 3])
@@ -207,7 +208,6 @@ with aba_ranking:
             ranking_jogadores = df_jogadores.sort_values(by="pontos", ascending=False).copy()
             ranking_jogadores["exibir_nome"] = ranking_jogadores["apelido"].fillna(ranking_jogadores["nome"])
             
-            # Configura a tabela exibindo todas as colunas de fundamentos solicitadas
             st.dataframe(
                 ranking_jogadores[["exibir_nome", "time", "ataques", "bloqueios", "aces", "pontos"]],
                 column_config={
@@ -226,6 +226,31 @@ with aba_ranking:
 # --- ABA 2: ELENCO & FICHAS (MODO ÁLBUM CARROSSEL) ---
 with aba_elenco:
     st.header("📖 Álbum de Figurinhas Premium — Copa 2026")
+    
+    st.markdown(
+        """
+        <style>
+        .carrossel-container {
+            display: flex;
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            gap: 15px;
+            padding: 10px 5px 20px 5px;
+            scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
+        }
+        .carrossel-container::-webkit-scrollbar {
+            height: 6px;
+        }
+        .carrossel-container::-webkit-scrollbar-thumb {
+            background-color: #333;
+            border-radius: 10px;
+        }
+        </style>
+        """, 
+        unsafe_allow_html=True
+    )
+    
     if not df_jogadores.empty:
         for time in TODOS_TIMES:
             atletas_do_time = df_jogadores[df_jogadores["time"].str.strip() == time.strip()]
@@ -271,13 +296,12 @@ with aba_elenco:
                 st.markdown(html_carrossel, unsafe_allow_html=True)
                 st.markdown("<br>", unsafe_allow_html=True)
     else:
-        st.info("Nenhum atleta cadastrado.")
+        st.info("Nenhum atleta cadastrado para montar o álbum.")
 
-# --- ABA 3: REGISTRO DE CONFRONTO RETROATIVO COM CABEÇALHOS EDITÁVEIS ---
+# --- ABA 3: REGISTRO DE CONFRONTO RETROATIVO TOTALMENTE DIGITÁVEL ---
 with aba_confronto:
     st.header("⚔️ Registrar Partidas Realizadas (Scout de Finais & Grupos)")
     
-    # Campo de senha direto na aba de registro para facilitar o acesso
     senha_confronto = st.text_input("🔒 Insira a Senha Master para liberar o registro:", type="password", key="senha_aba_confronto")
     
     if senha_confronto != "mikasa123":
@@ -287,16 +311,10 @@ with aba_confronto:
         st.markdown("---")
         st.subheader("📝 Configuração Geral da Partida")
         
-        # 1. Cabeçalho editável da fase do torneio
-        c_f1, c_f2 = st.columns([2, 2])
-        with c_f1:
-            fase_selecionada = st.selectbox("Escolha ou digite uma Fase/Título do Jogo:", options=FASES_TORNEIO, index=0)
-        with c_f2:
-            fase_customizada = st.text_input("✍️ Personalizar nome da Fase (Opcional - Substitui o campo ao lado):", placeholder="Ex: Grande Final - Jogo de Volta")
-        
-        fase_final_jogo = fase_customizada.strip() if fase_customizada.strip() != "" else fase_selecionada
+        # Título do jogo livre e digitável
+        fase_final_jogo = st.text_input("✍️ Nome da Fase / Título do Jogo:", value="Jogo 1", placeholder="Ex: Jogo 1, Semifinal, Terceiro Lugar, Final...")
 
-        # 2. Seleção de Equipes
+        # Seleção de Equipes
         c_t1, c_t2 = st.columns(2)
         with c_t1:
             time_a_sel = st.selectbox("Selecione o Time A:", options=TODOS_TIMES, index=0, key="retro_ta")
@@ -304,7 +322,7 @@ with aba_confronto:
             opcoes_time_b = [t for t in TODOS_TIMES if t != time_a_sel]
             time_b_sel = st.selectbox("Selecione o Time B:", options=opcoes_time_b, index=0, key="retro_tb")
 
-        # 3. Placar e Parciais Gerais do Jogo
+        # Placar e Parciais Gerais do Jogo
         st.markdown("#### 📊 Placar Geral do Confronto")
         c_p1, c_p2, c_p3 = st.columns([1, 1, 2])
         with c_p1:
@@ -314,7 +332,6 @@ with aba_confronto:
         with c_p3:
             parciais_finais = st.text_input("Parciais das parciais separadas por vírgula:", value="25-18, 25-21", placeholder="Ex: 25-18, 21-25, 15-10")
 
-        # Puxa atletas de ambas as seleções em tempo real
         jugadores_a = df_jogadores[df_jogadores["time"] == time_a_sel]
         jugadores_b = df_jogadores[df_jogadores["time"] == time_b_sel]
 
@@ -322,12 +339,11 @@ with aba_confronto:
             st.warning("Ambas as seleções precisam ter atletas cadastrados para registrar a súmula.")
         else:
             st.markdown("---")
-            st.markdown("### 🎯 Scout de Fundamentos por Atleta (Insira o total acumulado que fizeram nesta partida)")
+            st.markdown("### 🎯 Scout de Fundamentos por Atleta (Insira o total acumulado)")
             
-            # Dicionário temporário para armazenar o input numérico digitado direto pelo usuário
             stats_inseridas = {}
 
-            # Renderiza inputs de Digitação Direta para o Time A
+            # Time A
             st.markdown(f"#### 🏃‍♂️ Atletas de {time_a_sel}")
             for _, row in jugadores_a.iterrows():
                 j_id = row["id"]
@@ -348,7 +364,7 @@ with aba_confronto:
                 stats_inseridas[j_id] = {"ataques": atq, "bloqueios": blo, "aces": ace}
                 st.markdown("<div style='margin-top:-10px; border-bottom:1px dashed #333;'></div>", unsafe_allow_html=True)
 
-            # Renderiza inputs de Digitação Direta para o Time B
+            # Time B
             st.markdown(f"#### 🏃‍♂️ Atletas de {time_b_sel}")
             for _, row in jugadores_b.iterrows():
                 j_id = row["id"]
@@ -376,7 +392,8 @@ with aba_confronto:
                     st.rerun()
                 else:
                     st.error("Erro técnico ao salvar dados no Supabase. Cheque as conexões.")
-# --- ABA 4: HISTÓRICO DE JOGOS COM EXIBIÇÃO DA FASE DO JOGO ---
+
+# --- ABA 4: HISTÓRICO DE JOGOS ---
 with aba_historico:
     st.header("📜 Histórico de Partidas Realizadas")
     if not df_partidas.empty:
@@ -536,8 +553,6 @@ with aba_admin:
 
                 botao_salvar_partida = st.form_submit_button("💾 Salvar Alterações na Partida", type="primary")
                 if botao_salvar_partida:
-                    from supabase import create_client
-                    # Apenas um fallback simples para atualização de parciais antigas
                     dados = {"sets_a": n_sets_a, "sets_b": n_sets_b, "placar_sets": n_parciais}
                     supabase.table("partidas").update(dados).eq("id", id_partida_sel).execute()
                     st.success("Placar do histórico corrigido com sucesso!")
