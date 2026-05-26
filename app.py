@@ -238,7 +238,9 @@ if not df_jogadores.empty:
         elif pos == "levantador":
             nota = (atq * 0.8) + (blq * 1.0) + (ace * 1.5) + (sc * 1.8)
         elif pos == "libero":
-            nota = (sc * 2.0)
+    # Exatamente os mesmos pesos que você colocou no Ponteiro
+    nota = (atq * 1.5) + (blq * 1.0) + (ace * 1.5) + sc
+
         else:
             nota = (atq * 1.2) + (blq * 1.2) + (ace * 1.2) + sc
             
