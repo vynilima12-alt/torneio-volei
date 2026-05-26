@@ -243,12 +243,6 @@ if not df_jogadores.empty:
             nota = (atq * 1.2) + (blq * 1.2) + (ace * 1.2) + sc
             
         notas_impacto.append(nota)
-
-
-        else:
-            nota = (atq * 1.2) + (blq * 1.2) + (ace * 1.2) + sc
-            
-        notas_impacto.append(nota)
         
     df_jogadores["NIB"] = notas_impacto
 
