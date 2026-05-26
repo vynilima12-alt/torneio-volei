@@ -181,7 +181,7 @@ if not df_jogadores.empty:
     pontos_pro_dict = {time: 0 for time in TODOS_TIMES}
     pontos_contra_dict = {time: 0 for time in TODOS_TIMES}
     jogos_dict = {time: 0 for time in TODOS_TIMES}
-    vitorias_times = {time: 0 for time in TODOS_TIMES} # Nova contagem de vitórias realistas
+    vitorias_times = {time: 0 for time in TODOS_TIMES} 
     
     if not df_partidas.empty:
         for _, partida in df_partidas.iterrows():
@@ -195,7 +195,6 @@ if not df_jogadores.empty:
             jogos_dict[ta] += 1
             jogos_dict[tb] += 1
             
-            # Computa 3 pontos por vitória de partida para a tabela de classificação
             if sa > sb:
                 vitorias_times[ta] += 3
             elif sb > sa:
@@ -215,7 +214,7 @@ if not df_jogadores.empty:
 
     df_jogadores["SC"] = (df_jogadores["pontos_pro"] - df_jogadores["pontos_contra"]) / df_jogadores["jogos"]
 
-       pos_limpa = df_jogadores["posicao"].astype(str).str.lower()
+    pos_limpa = df_jogadores["posicao"].astype(str).str.lower()
     pos_limpa = pos_limpa.str.replace("(a)", "", regex=False).str.replace("í", "i", regex=False).str.strip()
     
     notas_impacto = []
@@ -247,7 +246,6 @@ if not df_jogadores.empty:
         
     df_jogadores["NIB"] = notas_impacto
 
-
     nib_min = df_jogadores["NIB"].min()
     nib_max = df_jogadores["NIB"].max()
 
@@ -257,6 +255,7 @@ if not df_jogadores.empty:
         df_jogadores["OVR"] = 75
         
     df_jogadores["OVR"] = df_jogadores["OVR"].round(0).astype(int)
+
 
 # =========================================================
 # 4. INTERFACE INTERATIVA (ABAS)
