@@ -20,7 +20,6 @@ TODOS_TIMES = GRUPO_A + GRUPO_B
 
 LISTA_POSICOES = ["Ponteiro(a)", "Central", "Levantador(a)", "Oposto(a)", "Líbero"]
 
-# Lista fixa de partidas conforme o desenho do torneio
 LISTA_JOGOS_TORNEIO = [
     f"Jogo {i}" for i in range(1, 17)
 ] + ["Semifinal 1", "Semifinal 2", "Terceiro Lugar", "Final"]
@@ -86,7 +85,6 @@ def zerar_rankings_banco():
 
 def salvar_partida_coletiva(fase, time_a, time_b, sets_a, sets_b, placar_sets):
     try:
-        # Registra apenas o placar do confronto de forma leve e rápida
         dados_partida = {
             "fase": fase, 
             "time_a": time_a, 
@@ -103,7 +101,6 @@ def salvar_partida_coletiva(fase, time_a, time_b, sets_a, sets_b, placar_sets):
 
 def atualizar_scout_total_jogador(jogador_id, novo_ataques, novo_bloqueios, novo_aces):
     try:
-        # Substitui diretamente os valores acumulados totais no Supabase
         supabase.table("jogadores").update({
             "ataques": novo_ataques,
             "bloqueios": novo_bloqueios,
@@ -201,20 +198,16 @@ if not df_jogadores.empty:
     df_jogadores["pontos_contra"] = df_jogadores["time"].map(pontos_contra_dict)
     df_jogadores["jogos"] = df_jogadores["time"].map(jogos_dict).replace(0, 1)
 
-    # Etapa 1: Ajustes Biométricos
     df_jogadores["FA"] = (180 / df_jogadores["altura"]) ** 0.25
     df_jogadores["FI"] = 1 + ((25 - df_jogadores["idade"]) / 100)
     df_jogadores["FI"] = df_jogadores["FI"].clip(0.90, 1.10)
 
-    # Etapa 2: Peso dos Fundamentos
     df_jogadores["AA"] = df_jogadores["ataques"] * df_jogadores["FA"] * df_jogadores["FI"]
     df_jogadores["BA"] = df_jogadores["bloqueios"] * df_jogadores["FA"] * 1.7
     df_jogadores["SA"] = df_jogadores["aces"] * 1.2
 
-    # Etapa 3: Impacto Coletivo (Saldo de sets médio)
     df_jogadores["SC"] = (df_jogadores["pontos_pro"] - df_jogadores["pontos_contra"]) / df_jogadores["jogos"]
 
-    # Etapa 4: Ajuste por Posição
     multiplicadores_posicao = {
         "central": 1.03, "ponteiro": 1.00, "oposto": 1.02, 
         "levantador": 1.04, "líbero": 1.05, "libero": 1.05
@@ -222,10 +215,8 @@ if not df_jogadores.empty:
     pos_limpa = df_jogadores["posicao"].str.lower().str.replace("(a)", "", regex=False).str.strip()
     df_jogadores["POS"] = pos_limpa.map(multiplicadores_posicao).fillna(1.00)
 
-    # Etapa 5: Nota de Impacto Bruta
     df_jogadores["NIB"] = ((df_jogadores["AA"] + df_jogadores["BA"] + df_jogadores["SA"]) * df_jogadores["POS"]) + df_jogadores["SC"]
 
-    # Etapa 6: Escala do Overall (65 a 99)
     nib_min = df_jogadores["NIB"].min()
     nib_max = df_jogadores["NIB"].max()
 
@@ -336,7 +327,7 @@ with aba_elenco:
                 st.markdown(html_carrossel, unsafe_allow_html=True)
                 st.markdown("<br>", unsafe_allow_html=True)
 
-# --- ABA 3: REGISTRO DE CONFRONTO LEVE (SÓ TIMES E PARCIAIS) ---
+# --- ABA 3: REGISTRO DE CONFRONTO LEVE ---
 with aba_confronto:
     st.header("⚔️ Registrar Súmula da Mesa (Finais & Grupos)")
     senha_confronto = st.text_input("🔒 Insira a Senha Master para liberar o registro:", type="password", key="senha_aba_confronto")
@@ -347,7 +338,6 @@ with aba_confronto:
         st.success("🔓 Súmula de Mesa liberada!")
         st.markdown("---")
         
-        # Lista de seleção fixa com os 18 jogos + fase final
         fase_final_jogo = st.selectbox("🎯 Escolha a Rodada / Partida correspondente:", options=LISTA_JOGOS_TORNEIO)
 
         c_t1, c_t2 = st.columns(2)
@@ -397,14 +387,14 @@ with aba_historico:
     else:
         st.info("Nenhum jogo registrado no histórico.")
 
-# --- ABA 5: PAINEL ADMIN (MÓDULO DE SCOUT TOTAL DOS 32) ---
+# --- ABA 5: PAINEL ADMIN ---
 with aba_admin:
     senha = st.text_input("Senha Master:", type="password")
     if senha == "mikasa123":
         st.session_state.admin_logado = True
         st.success("Acesso administrativo liberado!")
 
-        # LANÇADOR DE SCOUT ACUMULADO DO TORNEIO TODO
+        # 1. LANÇADOR DE SCOUT ACUMULADO DO TORNEIO TODO
         st.markdown("---")
         st.subheader("📈 Atualizar Scout Geral Acumulado do Torneio")
         st.caption("Selecione o jogador e digite os valores totais consolidados do campeonato.")
@@ -428,10 +418,62 @@ with aba_admin:
                 if atualizar_scout_total_jogador(jogador_selecionado, val_atq, val_blo, val_ace):
                     st.success("Estatísticas acumuladas atualizadas com sucesso no Supabase!")
                     st.rerun()
+
+        # 2. GERENCIAR E REMOVER PARTIDAS DO HISTÓRICO (RETORNADO)
+        st.markdown("---")
+        st.subheader("🎬 Gerenciar Partidas Salvas (Histórico)")
+        if not df_partidas.empty:
+            opcoes_partidas = [f"Jogo #{p['id']}: [{p['fase']}] {p['time_a']} vs {p['time_b']}" for _, p in df_partidas.iterrows()]
+            partida_selecionada = st.selectbox("Selecione qual partida deseja gerenciar/corrigir:", options=opcoes_partidas)
+            
+            id_partida_sel = int(partida_selecionada.split("Jogo #")[1].split(":")[0])
+            dados_partida = df_partidas[df_partidas["id"] == id_partida_sel].iloc[0]
+
+            with st.form(f"form_edicao_partida_{id_partida_sel}"):
+                st.write(f"Modificando resultado de: **{dados_partida['time_a']} vs {dados_partida['time_b']}**")
+                c_p1, c_p2, c_p3 = st.columns([1, 1, 2])
+                with c_p1:
+                    n_sets_a = st.number_input(f"Sets {dados_partida['time_a']}:", min_value=0, max_value=3, value=int(dados_partida['sets_a']))
+                with c_p2:
+                    n_sets_b = st.number_input(f"Sets {dados_partida['time_b']}:", min_value=0, max_value=3, value=int(dados_partida['sets_b']))
+                with c_p3:
+                    n_parciais = st.text_input("Parciais dos Sets (Ex: 21-15, 21-17):", value=str(dados_partida['placar_sets']))
+
+                botao_salvar_partida = st.form_submit_button("💾 Salvar Alterações na Partida", type="primary")
+                if botao_salvar_partida:
+                    dados = {"sets_a": n_sets_a, "sets_b": n_sets_b, "placar_sets": n_parciais}
+                    supabase.table("partidas").update(dados).eq("id", id_partida_sel).execute()
+                    st.success("Placar do histórico corrigido com sucesso!")
+                    st.rerun()
+            
+            confirma_partida = st.checkbox("Confirmo a exclusão permanente desta partida do histórico.", key=f"check_del_partida_{id_partida_sel}")
+            if st.button("🗑️ Excluir Partida Definitivamente", type="secondary", key=f"btn_del_partida_{id_partida_sel}"):
+                if confirma_partida:
+                    if deletar_partida_banco(id_partida_sel):
+                        st.success("Partida deletada e histórico atualizado!")
+                        st.rerun()
+                else:
+                    st.error("Marque a caixa de confirmação para deletar a partida.")
+        else:
+            st.info("Nenhuma partida registrada para edição.")
         
-        # ==========================================
-        # FORMULÁRIOS TRADICIONAIS DE CADASTRO/EDIÇÃO MANTIDOS ABAIXO
-        # ==========================================
+        # 3. ZERAR E RESETAR TORNEIO
+        st.markdown("---")
+        st.subheader("🚨 ZERAR E RESETAR TORNEIO")
+        st.warning("Atenção: O botão abaixo vai zerar TODOS os fundamentos (Ataques, Bloqueios, Aces e Totais) dos atletas no banco de dados.")
+        
+        confirmou_reset = st.checkbox("Estou ciente de que isso vai limpar totalmente o ranking acumulado.")
+        if st.button("🔄 Zerar Todos os Rankings", type="secondary"):
+            if confirmou_reset:
+                if zerar_rankings_banco():
+                    st.success("Scout zerado! Todos os jogadores voltaram para 0 pontos.")
+                    st.rerun()
+                else:
+                    st.error("Erro técnico ao tentar limpar os dados do Supabase.")
+            else:
+                st.error("Por favor, marque a caixa de confirmação antes de resetar.")        
+        
+        # 4. FORMULÁRIO COMPACTO DE CADASTRO
         st.markdown("---")
         st.subheader("➕ Cadastrar Jogador (Manual/Backup)")
         with st.form("form_cadastro_jogador", clear_on_submit=True):
@@ -455,6 +497,7 @@ with aba_admin:
                     st.success(f"Atleta {nome_novo} gravado com sucesso!")
                     st.rerun()
 
+        # 5. FORMULÁRIO DE EDIÇÃO DE ATLETAS
         st.markdown("---")
         st.subheader("🛠️ Editar Cadastro de Atleta")
         if not df_jogadores.empty:
@@ -487,3 +530,15 @@ with aba_admin:
                     if editar_jogador_banco(id_atleta, nome_editado, apelido_editado, time_editado, emoji_novo, idade_editada, posicao_editada, altura_editada, frase_editada):
                         st.success("Cadastro do atleta atualizado!")
                         st.rerun()
+                        
+            confirma_atleta = st.checkbox(f"Confirmo a exclusão definitiva de {jogador_editar}.", key=f"del_atleta_check_{id_atleta}")
+            if st.button("🗑️ Excluir Atleta do Torneio", type="secondary", key=f"btn_del_atleta_{id_atleta}"):
+                if confirma_atleta and deletar_jogador_banco(id_atleta):
+                    st.success("Jogador removido com sucesso.")
+                    st.rerun()
+                elif not confirma_atleta:
+                    st.error("Marque a caixa de confirmação para deletar a atleta.")
+        else:
+            st.info("Nenhum atleta cadastrado para edição.")
+    else:
+        st.session_state.admin_logado = False
