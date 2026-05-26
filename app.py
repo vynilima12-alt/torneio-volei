@@ -215,14 +215,38 @@ if not df_jogadores.empty:
 
     df_jogadores["SC"] = (df_jogadores["pontos_pro"] - df_jogadores["pontos_contra"]) / df_jogadores["jogos"]
 
-    multiplicadores_posicao = {
-        "central": 1.03, "ponteiro": 1.00, "oposto": 1.02, 
-        "levantador": 1.04, "líbero": 1.05, "libero": 1.05
-    }
-    pos_limpa = df_jogadores["posicao"].str.lower().str.replace("(a)", "", regex=False).str.strip()
-    df_jogadores["POS"] = pos_limpa.map(multiplicadores_posicao).fillna(1.00)
+       pos_limpa = df_jogadores["posicao"].astype(str).str.lower()
+    pos_limpa = pos_limpa.str.replace("(a)", "", regex=False).str.replace("í", "i", regex=False).str.strip()
+    
+    notas_impacto = []
 
-    df_jogadores["NIB"] = ((df_jogadores["AA"] + df_jogadores["BA"] + df_jogadores["SA"]) * df_jogadores["POS"]) + df_jogadores["SC"]
+    for idx, jogador in df_jogadores.iterrows():
+        pos = pos_limpa.iloc[idx]
+        
+        fa = jogador["FA"]
+        fi = jogador["FI"]
+        atq = jogador["ataques"] * fa * fi
+        blq = jogador["bloqueios"] * fa
+        ace = jogador["aces"] * 1.2
+        sc = jogador["SC"]
+        
+        if pos == "central":
+            nota = (atq * 1.0) + (blq * 2.0) + (ace * 1.2) + (sc * 1.1)
+        elif pos == "ponteiro":
+            nota = (atq * 1.5) + (blq * 1.0) + (ace * 1.5) + sc
+        elif pos == "oposto":
+            nota = (atq * 1.7) + (blq * 1.0) + (ace * 1.3) + sc
+        elif pos == "levantador":
+            nota = (atq * 0.8) + (blq * 1.0) + (ace * 1.5) + (sc * 1.8)
+        elif pos == "libero":
+            nota = (sc * 2.0)
+        else:
+            nota = (atq * 1.2) + (blq * 1.2) + (ace * 1.2) + sc
+            
+        notas_impacto.append(nota)
+        
+    df_jogadores["NIB"] = notas_impacto
+
 
     nib_min = df_jogadores["NIB"].min()
     nib_max = df_jogadores["NIB"].max()
