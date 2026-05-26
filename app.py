@@ -181,6 +181,7 @@ if not df_jogadores.empty:
     pontos_pro_dict = {time: 0 for time in TODOS_TIMES}
     pontos_contra_dict = {time: 0 for time in TODOS_TIMES}
     jogos_dict = {time: 0 for time in TODOS_TIMES}
+    vitorias_times = {time: 0 for time in TODOS_TIMES} # Nova contagem de vitórias realistas
     
     if not df_partidas.empty:
         for _, partida in df_partidas.iterrows():
@@ -193,6 +194,12 @@ if not df_jogadores.empty:
             pontos_contra_dict[tb] += sa
             jogos_dict[ta] += 1
             jogos_dict[tb] += 1
+            
+            # Computa 3 pontos por vitória de partida para a tabela de classificação
+            if sa > sb:
+                vitorias_times[ta] += 3
+            elif sb > sa:
+                vitorias_times[tb] += 3
 
     df_jogadores["pontos_pro"] = df_jogadores["time"].map(pontos_pro_dict)
     df_jogadores["pontos_contra"] = df_jogadores["time"].map(pontos_contra_dict)
@@ -241,15 +248,16 @@ aba_ranking, aba_elenco, aba_confronto, aba_historico, aba_admin = st.tabs([
     "🔒 Painel Admin"
 ])
 
-# --- ABA 1: RANKINGS ---
+# --- ABA 1: RANKINGS CORRIGIDOS ---
 with aba_ranking:
     if not df_jogadores.empty:
         col1, col2 = st.columns([2, 3])
         with col1:
             st.header("🏆 Classificação por Seleção")
-            ranking_times = df_jogadores.groupby("time")["pontos"].sum().reset_index()
-            ranking_times = ranking_times.sort_values(by="pontos", ascending=False)
-            st.dataframe(ranking_times, column_config={"time": "Seleção", "pontos": "Pontos Totais Conquistados"}, hide_index=True, use_container_width=True)
+            
+            # CORREÇÃO: Cria a tabela de classificação baseada nas vitórias reais computadas pelo histórico de jogos
+            df_classif_times = pd.DataFrame(list(vitorias_times.items()), columns=["Seleção", "Pontos"]).sort_values(by="Pontos", ascending=False)
+            st.dataframe(df_classif_times, column_config={"Seleção": "Seleção", "Pontos": "Pontos de Tabela (Vitórias)"}, hide_index=True, use_container_width=True)
             
         with col2:
             st.header("🔥 Scout Geral de Atletas (Ranking por Overall)")
@@ -419,7 +427,7 @@ with aba_admin:
                     st.success("Estatísticas acumuladas atualizadas com sucesso no Supabase!")
                     st.rerun()
 
-        # 2. GERENCIAR E REMOVER PARTIDAS DO HISTÓRICO (RETORNADO)
+        # 2. GERENCIAR E REMOVER PARTIDAS DO HISTÓRICO
         st.markdown("---")
         st.subheader("🎬 Gerenciar Partidas Salvas (Histórico)")
         if not df_partidas.empty:
