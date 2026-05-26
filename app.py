@@ -229,7 +229,7 @@ if not df_jogadores.empty:
         ace = jogador["aces"] * 1.2
         sc = jogador["SC"]
         
-        if pos == "central":
+                if pos == "central":
             nota = (atq * 1.0) + (blq * 2.0) + (ace * 1.2) + (sc * 1.1)
         elif pos == "ponteiro":
             nota = (atq * 1.5) + (blq * 1.0) + (ace * 1.5) + sc
@@ -238,8 +238,10 @@ if not df_jogadores.empty:
         elif pos == "levantador":
             nota = (atq * 0.8) + (blq * 1.0) + (ace * 1.5) + (sc * 1.8)
         elif pos == "libero":
-    # Exatamente os mesmos pesos que você colocou no Ponteiro
-    nota = (atq * 1.5) + (blq * 1.0) + (ace * 1.5) + sc
+            nota = (atq * 1.5) + (blq * 1.0) + (ace * 1.5) + sc
+        else:
+            nota = (atq * 1.2) + (blq * 1.2) + (ace * 1.2) + sc
+
 
         else:
             nota = (atq * 1.2) + (blq * 1.2) + (ace * 1.2) + sc
